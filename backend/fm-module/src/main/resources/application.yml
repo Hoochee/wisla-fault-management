@@ -1,0 +1,41 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: wisla-fm-module
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/wisla_fm}
+    username: ${DATABASE_USER:wisla}
+    password: ${DATABASE_PASSWORD:wisla}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+adapter:
+  base-url: ${ADAPTER_BASE_URL:http://localhost:8081}
+  public-url: ${ADAPTER_PUBLIC_URL:http://localhost:8081}
+  internal-token: ${ADAPTER_INTERNAL_TOKEN:dev-internal-token}
+
+zabbix-simulator:
+  base-url: ${ZABBIX_SIMULATOR_BASE_URL:http://localhost:8082}
+
+wisla:
+  jwt:
+    secret: ${JWT_SECRET:change-me-in-production-use-at-least-32-characters-secret}
+    expiration-seconds: ${JWT_EXPIRATION_SECONDS:3600}
+  service:
+    api-key: ${SERVICE_API_KEY:dev-service-key}

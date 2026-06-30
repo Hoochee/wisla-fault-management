@@ -1,0 +1,29 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:wisla_fm;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  liquibase:
+    enabled: false
+
+adapter:
+  base-url: http://localhost:18081
+  public-url: http://localhost:18081
+  internal-token: test-internal-token
+
+zabbix-simulator:
+  base-url: http://localhost:18082
+
+wisla:
+  jwt:
+    secret: test-jwt-secret-at-least-32-characters-long
+    expiration-seconds: 3600
+  service:
+    api-key: test-service-key

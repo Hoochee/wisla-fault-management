@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: wisla-fm-adapter
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/wisla_fm_adapter}
+    username: ${DATABASE_USER:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+server:
+  port: ${PORT:8081}
+
+wisla:
+  adapter:
+    version: ${ADAPTER_VERSION:1.0.0}
+    fm-module-base-url: ${FM_MODULE_BASE_URL:http://localhost:8080}
+    fm-module-service-key: ${FM_MODULE_SERVICE_KEY:dev-service-key}
+    internal-service-token: ${INTERNAL_SERVICE_TOKEN:change-me-internal-token}
+    max-payload-bytes: ${MAX_PAYLOAD_BYTES:1048576}
+    buffer-retry-base-seconds: ${BUFFER_RETRY_BASE_SECONDS:30}
+    buffer-retry-interval-ms: ${BUFFER_RETRY_INTERVAL_MS:60000}
+    fm-module-health-check-enabled: ${FM_MODULE_HEALTH_CHECK:true}
+    config-sync-interval-ms: ${CONFIG_SYNC_INTERVAL_MS:300000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

@@ -1,0 +1,3667 @@
+openapi: 3.1.0
+info:
+  title: WISLA FM — fm-module BFF API
+  version: 1.0.0
+  description: |
+    REST API for WISLA Fault Management module (BFF on port 8080).
+    Serves Angular SPA and adapter ingestion. JSON bodies use **camelCase**.
+    PostgreSQL database: `wisla_fm`.
+
+servers:
+  - url: http://localhost:8080
+    description: fm-module (BFF + static Angular)
+
+tags:
+  - name: system
+    description: Health and probes
+  - name: auth
+    description: Authentication and session
+  - name: ingest
+    description: Adapter → fm-module event intake
+  - name: events
+    description: Processed FM events (console)
+  - name: raw-events
+    description: Primary / pre-dedup events
+  - name: sources
+    description: Event sources (adapters)
+  - name: adapters
+    description: Adapter service runtime
+  - name: rules
+    description: Processing rules and canvas
+  - name: notifications
+    description: In-app push notifications from rule canvas
+  - name: health
+    description: Product and CI health read-models
+  - name: console
+    description: Event maps (saved filters)
+  - name: admin
+    description: Users, roles, configuration items, products
+  - name: settings
+    description: Module and user preferences
+  - name: dashboard
+    description: Dashboard aggregates
+  - name: internal
+    description: Service-to-service (adapter cache)
+
+paths:
+  /health:
+    get:
+      tags: [system]
+      summary: Liveness / readiness probe
+      operationId: getHealth
+      security: []
+      x-mvp: true
+      responses:
+        '200':
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      summary: Authenticate user and issue JWT
+      operationId: login
+      security: []
+      x-mvp: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/auth/me:
+    get:
+      tags: [auth]
+      summary: Current authenticated user profile
+      operationId: getCurrentUser
+      x-mvp: true
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/ingest:
+    post:
+      tags: [ingest]
+      summary: Ingest raw event batch from adapter
+      description: |
+        Synchronous HTTPS intake from adapter service.
+        Authenticated via source API key (`X-Api-Key` header or `Authorization: Bearer {apiKey}`).
+        Query parameter `sourceKey` must match the configured key for the source.
+      operationId: ingestEvents
+      security:
+        - sourceApiKey: []
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/sourceKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestRequest'
+      responses:
+        '202':
+          description: Batch accepted for processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Source blocked or inactive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/events:
+    get:
+      tags: [events]
+      summary: List processed events for console
+      operationId: listEvents
+      x-mvp: true
+      parameters:
+        - name: status
+          in: query
+          description: Filter by event status (repeatable)
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/EventStatus'
+          style: form
+          explode: true
+        - name: severity
+          in: query
+          description: Filter by severity (repeatable)
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/Severity'
+          style: form
+          explode: true
+        - name: query
+          in: query
+          description: No-code query string (map query DSL)
+          schema:
+            type: string
+        - name: mapId
+          in: query
+          description: Apply saved event map filter by ID
+          schema:
+            type: string
+            format: uuid
+        - name: ciId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: productId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: sourceId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: assignedUserId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: createdFrom
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: createdTo
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+        - name: sort
+          in: query
+          description: |
+            Sort field and direction (`field,direction`). Default: `createdAt,desc`.
+            Allowed fields: `createdAt`, `lastRepeatAt`, `repeatCount`, `severity`, `status`, `title`, `nodeFqdn`, `systemName`.
+            `severity` uses custom order fatal → normal; `lastRepeatAt` nulls last on desc, nulls first on asc.
+          schema:
+            type: string
+            default: createdAt,desc
+      responses:
+        '200':
+          description: Paged event list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventPage'
+        '400':
+          description: Invalid sort field or direction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/events/batch:
+    post:
+      tags: [events]
+      summary: Bulk create or update events (service integration)
+      operationId: createEventsBatch
+      x-mvp: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [events]
+              properties:
+                events:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/EventCreate'
+      responses:
+        '200':
+          description: Batch processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  created:
+                    type: integer
+                  updated:
+                    type: integer
+                  ids:
+                    type: array
+                    items:
+                      type: string
+                      format: uuid
+
+  /api/v1/events/{id}:
+    get:
+      tags: [events]
+      summary: Get event by ID (card view)
+      operationId: getEvent
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/eventId'
+      responses:
+        '200':
+          description: Event with action log and relations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [events]
+      summary: Partial update (status, severity, assignment, tags)
+      operationId: patchEvent
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/eventId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventPatch'
+      responses:
+        '200':
+          description: Updated event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Invalid state transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/events/{id}/actions:
+    post:
+      tags: [events]
+      summary: Operator action on event
+      description: Actions — `take`, `close`, `comment`, `defer`, `maintenance`
+      operationId: postEventAction
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/eventId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventActionRequest'
+      responses:
+        '200':
+          description: Action recorded; updated event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventActionResult'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Action not allowed in current state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/events/{id}/history:
+    get:
+      tags: [events]
+      summary: Attribute change history (ClickHouse in prod)
+      operationId: getEventHistory
+      x-mvp: false
+      parameters:
+        - $ref: '#/components/parameters/eventId'
+      responses:
+        '200':
+          description: History entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventHistoryEntry'
+
+  /api/v1/raw-events:
+    get:
+      tags: [raw-events]
+      summary: List primary / pre-processing events
+      operationId: listRawEvents
+      x-mvp: true
+      parameters:
+        - name: sourceId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: severity
+          in: query
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/Severity'
+          style: form
+          explode: true
+        - name: query
+          in: query
+          schema:
+            type: string
+        - name: processed
+          in: query
+          description: Filter by processing status
+          schema:
+            type: boolean
+        - name: createdFrom
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: createdTo
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+      responses:
+        '200':
+          description: Paged raw events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RawEventPage'
+
+  /api/v1/adapters/runtime:
+    get:
+      tags: [adapters]
+      summary: Adapter service runtime and per-source status
+      operationId: getAdapterRuntime
+      x-mvp: true
+      responses:
+        '200':
+          description: Aggregated adapter health and source runtime bindings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdapterRuntimeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/sources:
+    get:
+      tags: [sources]
+      summary: List event sources
+      operationId: listSources
+      x-mvp: true
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/SourceStatus'
+        - name: type
+          in: query
+          schema:
+            $ref: '#/components/schemas/SourceType'
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Source list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventSource'
+    post:
+      tags: [sources]
+      summary: Create event source
+      operationId: createSource
+      x-mvp: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventSourceCreate'
+      responses:
+        '201':
+          description: Source created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventSource'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/sources/{id}:
+    get:
+      tags: [sources]
+      summary: Get source by ID
+      operationId: getSource
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/sourceId'
+      responses:
+        '200':
+          description: Source details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventSourceDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [sources]
+      summary: Update source configuration
+      operationId: patchSource
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/sourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventSourcePatch'
+      responses:
+        '200':
+          description: Updated source
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventSource'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [sources]
+      summary: Delete source
+      operationId: deleteSource
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/sourceId'
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Source has dependent events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/sources/{id}/test:
+    post:
+      tags: [sources]
+      summary: Test source connectivity via adapter probe
+      description: |
+        Orchestrates adapter `POST /internal/probe` for the source. When the plain-text API key
+        is not stored server-side, the UI passes `ingestApiKey` from sessionStorage (after create
+        or regenerate). fm-module syncs source config to adapter before probing.
+      operationId: testSource
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/sourceId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SourceTestRequest'
+      responses:
+        '200':
+          description: Test result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceTestResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          description: Adapter probe unreachable or failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/sources/{id}/bind-simulator:
+    post:
+      tags: [sources]
+      summary: Bind zabbix-simulator to this source (demo)
+      description: |
+        Configures dev/demo zabbix-simulator via `POST /config` with this source's webhook key
+        and the provided `ingestApiKey`. Demo/admin feature — not for production Zabbix integration.
+      operationId: bindSimulator
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/sourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BindSimulatorRequest'
+      responses:
+        '200':
+          description: Simulator configured for this source
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BindSimulatorResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          description: zabbix-simulator unreachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/sources/{id}/send-test-event:
+    post:
+      tags: [sources]
+      summary: Send one test event via bound zabbix-simulator
+      description: |
+        Proxies `POST /tick` on zabbix-simulator. Requires prior `bind-simulator`.
+        Delivers a problem or recovery webhook through adapter → fm-module ingest.
+      operationId: sendTestEvent
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/sourceId'
+      responses:
+        '200':
+          description: Tick result from simulator
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceSimulatorTickResult'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Simulator not bound to this source
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: zabbix-simulator unreachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/sources/{id}/simulator-control:
+    post:
+      tags: [sources]
+      summary: Enable or disable zabbix-simulator auto-tick
+      description: |
+        Proxies `POST /control` on zabbix-simulator. Toggles periodic webhook delivery
+        for the bound demo source. Used by the source card «Автотик» switch.
+      operationId: setSimulatorControl
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/sourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SourceSimulatorControlRequest'
+      responses:
+        '200':
+          description: Auto-tick state after control
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceSimulatorControlResult'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          description: zabbix-simulator unreachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/sources/{id}/simulator-status:
+    get:
+      tags: [sources]
+      summary: zabbix-simulator health and binding for this source
+      description: |
+        Aggregates simulator `GET /health` with whether runtime config matches this source's
+        webhook key. Used by the source card demo block (bind status, auto-tick, webhook URL).
+      operationId: getSimulatorStatus
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/sourceId'
+      responses:
+        '200':
+          description: Simulator status for this source
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceSimulatorStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          description: zabbix-simulator unreachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/sources/{id}/runs:
+    get:
+      tags: [sources]
+      summary: Pull source execution log
+      operationId: listSourceRuns
+      x-mvp: false
+      parameters:
+        - $ref: '#/components/parameters/sourceId'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+      responses:
+        '200':
+          description: Execution log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SourceRunLog'
+                  page:
+                    $ref: '#/components/schemas/PageMeta'
+
+  /api/v1/rules:
+    get:
+      tags: [rules]
+      summary: List processing rules
+      operationId: listRules
+      x-mvp: true
+      parameters:
+        - name: ruleType
+          in: query
+          schema:
+            $ref: '#/components/schemas/RuleType'
+        - name: enabled
+          in: query
+          schema:
+            type: boolean
+        - name: approvalStatus
+          in: query
+          schema:
+            $ref: '#/components/schemas/ApprovalStatus'
+      responses:
+        '200':
+          description: Rule list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProcessingRule'
+    post:
+      tags: [rules]
+      summary: Create processing rule
+      description: |
+        When `canvas` is present, the server validates graph structure before persist:
+        at least one **stream trigger** (`type=trigger`, `data.triggerType=stream`) reachable
+        from the graph entry, and at least one **action block** (`dedup`, `threshold`,
+        `correlation`, `notify`, or `push`) on a path from that trigger. Orphan nodes (not connected to the
+        trigger subgraph) are rejected. **notify** blocks require `data.channel` (`telegram` or `email`);
+        when `channel=email`, `data.emailAddress` must be a valid email. `status` blocks are accepted but not executed at
+        runtime (post-MVP). **notify** is a stub at runtime (no real SMTP/Telegram); **push** persists in-app notifications for UI polling.
+      operationId: createRule
+      x-mvp: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProcessingRuleCreate'
+      responses:
+        '201':
+          description: Rule created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingRuleDetail'
+        '400':
+          description: Invalid canvas structure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingStreamTrigger:
+                  summary: No stream trigger
+                  value:
+                    error: canvas_validation
+                    message: Rule canvas must include at least one trigger with triggerType=stream
+                    details:
+                      - field: canvas.nodes
+                        message: missing_stream_trigger
+                missingActionBlock:
+                  summary: No action block on trigger path
+                  value:
+                    error: canvas_validation
+                    message: Rule canvas must include at least one action block (dedup, threshold, correlation, notify, or push) reachable from the stream trigger
+                    details:
+                      - field: canvas.nodes
+                        message: missing_action_block
+                notifyMissingChannel:
+                  summary: Notify block without channel
+                  value:
+                    error: canvas_validation
+                    message: Notify block requires channel (telegram or email)
+                    details:
+                      - field: canvas.nodes
+                        message: notify_missing_channel
+                notifyInvalidEmail:
+                  summary: Notify email channel without valid address
+                  value:
+                    error: canvas_validation
+                    message: Notify block with email channel requires a valid emailAddress
+                    details:
+                      - field: canvas.nodes
+                        message: notify_invalid_email
+                orphanNodes:
+                  summary: Disconnected nodes
+                  value:
+                    error: canvas_validation
+                    message: Rule canvas contains nodes not reachable from the stream trigger
+                    details:
+                      - field: canvas.nodes
+                        message: orphan_nodes
+
+  /api/v1/rules/{id}:
+    get:
+      tags: [rules]
+      summary: Get rule with canvas definition and versions
+      operationId: getRule
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/ruleId'
+      responses:
+        '200':
+          description: Rule detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingRuleDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [rules]
+      summary: Update rule metadata or canvas
+      description: |
+        Same canvas validation as `POST /api/v1/rules` when `canvas` is included in the
+        request body. Partial updates without `canvas` skip graph validation.
+        When `enabled: true`, validates the stored (or patched) canvas if it has nodes;
+        returns `400 canvas_validation` when the graph is invalid.
+      operationId: patchRule
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/ruleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProcessingRulePatch'
+      responses:
+        '200':
+          description: Updated rule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingRuleDetail'
+        '400':
+          description: Invalid canvas structure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [rules]
+      summary: Delete rule
+      operationId: deleteRule
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/ruleId'
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/rules/{id}/activate:
+    post:
+      tags: [rules]
+      summary: Enable rule (Monq «Запустить БП»)
+      operationId: activateRule
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/ruleId'
+      responses:
+        '200':
+          description: Rule activated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingRule'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Rule not approved or canvas fails validation (same rules as POST/PATCH)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/rules/{id}/deactivate:
+    post:
+      tags: [rules]
+      summary: Disable rule
+      operationId: deactivateRule
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/ruleId'
+      responses:
+        '200':
+          description: Rule deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingRule'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/rules/{id}/approve:
+    post:
+      tags: [rules]
+      summary: Approve rule (Согласующий role)
+      operationId: approveRule
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/ruleId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+      responses:
+        '200':
+          description: Rule approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingRule'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/notifications/push:
+    get:
+      tags: [notifications]
+      summary: List in-app push notifications since timestamp
+      description: |
+        Used by the SPA to poll for toast notifications created when a rule canvas **push**
+        block executes. Pass `since` as ISO-8601 instant from the last successful poll;
+        omit or use epoch to fetch all recent items. Real SMTP/Telegram delivery is handled
+        by the **notify** block (stub in MVP+).
+      operationId: listPushNotifications
+      x-mvp: true
+      parameters:
+        - name: since
+          in: query
+          required: false
+          description: Return notifications with `createdAt` strictly after this instant (ISO-8601)
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Push notifications for in-app toast
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushNotificationList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/health/products:
+    get:
+      tags: [health]
+      summary: Product heatmap data
+      operationId: listProductHealth
+      x-mvp: true
+      parameters:
+        - name: tenant
+          in: query
+          schema:
+            type: string
+        - name: site
+          in: query
+          schema:
+            type: string
+        - name: tag
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Products with health aggregates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductHealth'
+
+  /api/v1/health/products/{id}:
+    get:
+      tags: [health]
+      summary: Product card with CIs and active events
+      operationId: getProductHealth
+      x-mvp: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Product health detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductHealthDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/health/ci/{ciId}:
+    get:
+      tags: [health]
+      summary: CI health profile (drill-down)
+      operationId: getCiHealth
+      x-mvp: true
+      parameters:
+        - name: ciId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: CI health profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CiHealthProfile'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/console/maps:
+    get:
+      tags: [console]
+      summary: List event maps (system + personal)
+      operationId: listEventMaps
+      x-mvp: true
+      parameters:
+        - name: includeSystem
+          in: query
+          schema:
+            type: boolean
+            default: true
+        - name: personalOnly
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Event maps
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventMap'
+    post:
+      tags: [console]
+      summary: Create event map
+      operationId: createEventMap
+      x-mvp: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventMapCreate'
+      responses:
+        '201':
+          description: Map created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventMap'
+
+  /api/v1/console/maps/{id}:
+    patch:
+      tags: [console]
+      summary: Update event map
+      operationId: patchEventMap
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/mapId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventMapPatch'
+      responses:
+        '200':
+          description: Updated map
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventMap'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [console]
+      summary: Delete personal event map
+      operationId: deleteEventMap
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/mapId'
+      responses:
+        '204':
+          description: Deleted
+        '403':
+          description: Cannot delete system map
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/admin/users:
+    get:
+      tags: [admin]
+      summary: List users
+      operationId: listUsers
+      x-mvp: true
+      parameters:
+        - name: active
+          in: query
+          schema:
+            type: boolean
+        - name: search
+          in: query
+          schema:
+            type: string
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+      responses:
+        '200':
+          description: User page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPage'
+    post:
+      tags: [admin]
+      summary: Create user
+      operationId: createUser
+      x-mvp: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /api/v1/admin/users/{id}:
+    get:
+      tags: [admin]
+      summary: Get user by ID
+      operationId: getUser
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/userId'
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [admin]
+      summary: Update user
+      operationId: patchUser
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/userId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPatch'
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/admin/roles:
+    get:
+      tags: [admin]
+      summary: List roles
+      operationId: listRoles
+      x-mvp: true
+      responses:
+        '200':
+          description: Roles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Role'
+    post:
+      tags: [admin]
+      summary: Create role
+      operationId: createRole
+      x-mvp: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleCreate'
+      responses:
+        '201':
+          description: Role created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+
+  /api/v1/admin/roles/{id}:
+    get:
+      tags: [admin]
+      summary: Get role by ID
+      operationId: getRole
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/roleId'
+      responses:
+        '200':
+          description: Role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [admin]
+      summary: Update role permissions
+      operationId: patchRole
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/roleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RolePatch'
+      responses:
+        '200':
+          description: Updated role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/admin/configuration-items:
+    get:
+      tags: [admin]
+      summary: List configuration items (CMDB)
+      operationId: listConfigurationItems
+      x-mvp: true
+      parameters:
+        - name: productId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: tag
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          description: Search by FQDN or system name
+          schema:
+            type: string
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+      responses:
+        '200':
+          description: CI page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigurationItemPage'
+    post:
+      tags: [admin]
+      summary: Create configuration item
+      operationId: createConfigurationItem
+      x-mvp: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigurationItemCreate'
+      responses:
+        '201':
+          description: CI created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigurationItem'
+
+  /api/v1/admin/configuration-items/{id}:
+    get:
+      tags: [admin]
+      summary: Get configuration item
+      operationId: getConfigurationItem
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/ciId'
+      responses:
+        '200':
+          description: Configuration item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigurationItem'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [admin]
+      summary: Update configuration item
+      operationId: patchConfigurationItem
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/ciId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigurationItemPatch'
+      responses:
+        '200':
+          description: Updated CI
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigurationItem'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/admin/products:
+    get:
+      tags: [admin]
+      summary: List products (admin)
+      description: Admin read of product records with linked CI ids. Does not include health aggregates (`maxSeverity`, `activeEventCount`); use `GET /api/v1/health/products` for heatmap data.
+      operationId: listProducts
+      x-mvp: true
+      responses:
+        '200':
+          description: Products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductAdmin'
+        '403':
+          description: Administrator role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [admin]
+      summary: Create product
+      description: |
+        Creates a product. When `ciIds` is provided, links each CI via `product_ci`.
+        Requires administrator role.
+      operationId: createProduct
+      x-mvp: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductCreate'
+      responses:
+        '201':
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductAdmin'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: Administrator role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Product code already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/admin/products/{id}:
+    get:
+      tags: [admin]
+      summary: Get product by ID
+      operationId: getProduct
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/productId'
+      responses:
+        '200':
+          description: Product
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductAdmin'
+        '403':
+          description: Administrator role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [admin]
+      summary: Update product
+      description: |
+        Partial update of product attributes. When `ciIds` is **present**, all existing
+        `product_ci` rows for this product are deleted and replaced with the provided list
+        (empty array clears all links). When `ciIds` is **omitted**, CI membership is unchanged.
+        Requires administrator role.
+      operationId: patchProduct
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/productId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductPatch'
+      responses:
+        '200':
+          description: Updated product
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductAdmin'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: Administrator role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Product code already exists on another product
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [admin]
+      summary: Delete product
+      description: |
+        Deletes a product with no linked CIs. When one or more CIs are still linked via
+        `product_ci`, returns **409** — clear membership first (PATCH with `"ciIds": []`).
+        Requires administrator role.
+      operationId: deleteProduct
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/productId'
+      responses:
+        '204':
+          description: Deleted
+        '403':
+          description: Administrator role required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Product has linked configuration items; unlink CIs before delete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/admin/consoles:
+    get:
+      tags: [admin]
+      summary: List console access scopes
+      operationId: listConsoles
+      x-mvp: false
+      responses:
+        '200':
+          description: Console scopes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConsoleScope'
+    post:
+      tags: [admin]
+      summary: Create console access scope
+      operationId: createConsole
+      x-mvp: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsoleScopeCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsoleScope'
+
+  /api/v1/settings:
+    get:
+      tags: [settings]
+      summary: Module settings and current user profile preferences
+      operationId: getSettings
+      x-mvp: true
+      responses:
+        '200':
+          description: Settings bundle
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsBundle'
+    patch:
+      tags: [settings]
+      summary: Update module settings (admin) or user profile slice
+      operationId: patchSettings
+      x-mvp: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SettingsPatch'
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsBundle'
+
+  /api/v1/settings/notifications:
+    get:
+      tags: [settings]
+      summary: Notification rules
+      operationId: getNotificationSettings
+      x-mvp: false
+      responses:
+        '200':
+          description: Notification configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationSettings'
+    patch:
+      tags: [settings]
+      summary: Update notification rules
+      operationId: patchNotificationSettings
+      x-mvp: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationSettings'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationSettings'
+
+  /api/v1/settings/integrations:
+    get:
+      tags: [settings]
+      summary: External integrations (WISLA, ITSM)
+      operationId: getIntegrationSettings
+      x-mvp: false
+      responses:
+        '200':
+          description: Integration config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationSettings'
+    patch:
+      tags: [settings]
+      summary: Update integrations
+      operationId: patchIntegrationSettings
+      x-mvp: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntegrationSettings'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationSettings'
+
+  /api/v1/dashboard/summary:
+    get:
+      tags: [dashboard]
+      summary: Dashboard severity counters and quick links data
+      operationId: getDashboardSummary
+      x-mvp: true
+      responses:
+        '200':
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummary'
+
+  /api/v1/downtime:
+    get:
+      tags: [settings]
+      summary: List downtime windows
+      operationId: listDowntime
+      x-mvp: false
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [scheduled, active, completed, cancelled]
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+      responses:
+        '200':
+          description: Downtime list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Downtime'
+                  page:
+                    $ref: '#/components/schemas/PageMeta'
+    post:
+      tags: [settings]
+      summary: Create downtime window
+      operationId: createDowntime
+      x-mvp: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DowntimeCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Downtime'
+
+  /api/v1/downtime/{id}:
+    get:
+      tags: [settings]
+      summary: Get downtime window
+      operationId: getDowntime
+      x-mvp: false
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Downtime detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Downtime'
+    patch:
+      tags: [settings]
+      summary: Update or force-stop downtime
+      operationId: patchDowntime
+      x-mvp: false
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DowntimePatch'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Downtime'
+
+  /api/v1/reports/kpi:
+    get:
+      tags: [dashboard]
+      summary: Specialist KPI report
+      operationId: getKpiReport
+      x-mvp: false
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: KPI data
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/v1/internal/sources/{id}/config:
+    get:
+      tags: [internal]
+      summary: Source config for adapter cache pull
+      description: Called by adapter to refresh `source_config_snapshots`. Service auth.
+      operationId: getInternalSourceConfig
+      security:
+        - serviceApiKey: []
+      x-mvp: true
+      parameters:
+        - $ref: '#/components/parameters/sourceId'
+      responses:
+        '200':
+          description: Source config snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalSourceConfig'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: User session JWT from `/api/v1/auth/login`
+    sourceApiKey:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: Per-source API key for ingest
+    serviceApiKey:
+      type: apiKey
+      in: header
+      name: X-Service-Key
+      description: Adapter service account key for internal endpoints
+
+  parameters:
+    page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    size:
+      name: size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 50
+    sourceKey:
+      name: sourceKey
+      in: query
+      required: true
+      schema:
+        type: string
+      description: Source API key identifier
+    eventId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    sourceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ruleId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    mapId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    userId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    roleId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ciId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    productId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Authentication required or invalid credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+  # --- Primitives & enums ---
+    Severity:
+      type: string
+      enum: [fatal, critical, major, minor, warning, normal]
+
+    EventStatus:
+      type: string
+      enum: [new, in_progress, closed, archived, maintenance, deferred]
+
+    SourceType:
+      type: string
+      enum: [push_rest, push_snmp_trap, pull_etl]
+
+    SourceStatus:
+      type: string
+      enum: [active, inactive, blocked]
+
+    RuleType:
+      type: string
+      enum: [dedup, problem_resolution, correlation, threshold]
+
+    ApprovalStatus:
+      type: string
+      enum: [approved, pending, draft]
+
+    HealthLevel:
+      type: string
+      enum: [fatal, critical, major, warning, ok, unknown]
+
+    InfluenceType:
+      type: string
+      enum: [combo, weighted, critical]
+
+    EventActionType:
+      type: string
+      enum: [take, close, comment, defer, maintenance]
+
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, down]
+        version:
+          type: string
+        database:
+          type: string
+          enum: [up, down]
+
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+    PageMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+
+  # --- Auth ---
+    LoginRequest:
+      type: object
+      required: [login, password]
+      properties:
+        login:
+          type: string
+        password:
+          type: string
+          format: password
+
+    LoginResponse:
+      type: object
+      required: [accessToken, tokenType, expiresIn, user]
+      properties:
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+          example: Bearer
+        expiresIn:
+          type: integer
+          description: Seconds until expiry
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      required: [id, login, fullName, email, roleIds, team, active]
+      properties:
+        id:
+          type: string
+          format: uuid
+        login:
+          type: string
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+        roleIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        team:
+          type: string
+        active:
+          type: boolean
+
+    UserCreate:
+      type: object
+      required: [login, fullName, email, password, roleIds]
+      properties:
+        login:
+          type: string
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        roleIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        team:
+          type: string
+        active:
+          type: boolean
+          default: true
+
+    UserPatch:
+      type: object
+      properties:
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+        roleIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        team:
+          type: string
+        active:
+          type: boolean
+        password:
+          type: string
+          format: password
+
+    UserPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        page:
+          $ref: '#/components/schemas/PageMeta'
+
+    Role:
+      type: object
+      required: [id, name, description, permissions]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+          description: |
+            Permission codes, e.g. `console`, `events`, `sources`, `sources:read`,
+            `rules`, `rules:approve`, `admin`, `settings`, `settings:profile`, `api:ingest`
+
+    RoleCreate:
+      type: object
+      required: [name, permissions]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+
+    RolePatch:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+
+  # --- Ingest ---
+    IngestRequest:
+      type: object
+      properties:
+        heartbeat:
+          type: boolean
+          default: false
+          description: Adapter heartbeat (no event payload)
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/IngestEventPayload'
+        adapterVersion:
+          type: string
+        receivedAt:
+          type: string
+          format: date-time
+
+    IngestEventPayload:
+      type: object
+      required: [externalId, title, severity, occurredAt]
+      properties:
+        externalId:
+          type: string
+          description: Idempotency key from source
+        title:
+          type: string
+        description:
+          type: string
+        severity:
+          $ref: '#/components/schemas/Severity'
+        status:
+          $ref: '#/components/schemas/EventStatus'
+        occurredAt:
+          type: string
+          format: date-time
+        nodeFqdn:
+          type: string
+        attributes:
+          type: object
+          additionalProperties: true
+        rawPayload:
+          type: object
+          additionalProperties: true
+
+    IngestResponse:
+      type: object
+      properties:
+        accepted:
+          type: integer
+        rejected:
+          type: integer
+        rawEventIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        heartbeatAck:
+          type: boolean
+
+  # --- Events ---
+    Event:
+      type: object
+      required:
+        - id
+        - status
+        - severity
+        - title
+        - description
+        - repeatCount
+        - ciId
+        - nodeFqdn
+        - systemName
+        - sourceId
+        - createdAt
+        - sourceAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/EventStatus'
+        severity:
+          $ref: '#/components/schemas/Severity'
+        title:
+          type: string
+        description:
+          type: string
+        assignedUserId:
+          type: string
+          format: uuid
+        assignedUserName:
+          type: string
+          description: Denormalized display name (API only)
+        repeatCount:
+          type: integer
+          minimum: 1
+        ciId:
+          type: string
+          format: uuid
+        nodeFqdn:
+          type: string
+        systemName:
+          type: string
+        subsystemName:
+          type: string
+        sourceId:
+          type: string
+          format: uuid
+        sourceName:
+          type: string
+          description: Denormalized (API only)
+        rootEventId:
+          type: string
+          format: uuid
+          description: |
+            Parent event ID when this event is a **child** in a correlation group.
+            Set by the correlation canvas block when N matching events occur within the
+            configured window; the earliest event in the window becomes the root.
+            Omitted on root events and uncorrelated events.
+        childEventIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: |
+            IDs of **child** events linked to this event as correlation root.
+            Populated on `GET /api/v1/events/{id}` (EventDetail) when this event is the
+            root of a correlation group. Empty or omitted when there are no children.
+        itsmIncidentNumber:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        sourceAt:
+          type: string
+          format: date-time
+        lastRepeatAt:
+          type: string
+          format: date-time
+        takenAt:
+          type: string
+          format: date-time
+        closedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    EventDetail:
+      allOf:
+        - $ref: '#/components/schemas/Event'
+        - type: object
+          description: |
+            Event card view. Correlation links (`rootEventId`, `childEventIds`) reflect
+            runtime output of enabled rules with a `correlation` canvas block.
+          properties:
+            attributes:
+              type: array
+              items:
+                $ref: '#/components/schemas/EventAttribute'
+            actionLogs:
+              type: array
+              items:
+                $ref: '#/components/schemas/EventActionLog'
+            rawEventId:
+              type: string
+              format: uuid
+
+    EventAttribute:
+      type: object
+      properties:
+        key:
+          type: string
+        type:
+          type: string
+          enum: [string, number, boolean, date, uuid]
+        value:
+          oneOf:
+            - type: string
+            - type: number
+            - type: boolean
+
+    EventCreate:
+      type: object
+      required: [title, severity, ciId, sourceId]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        severity:
+          $ref: '#/components/schemas/Severity'
+        status:
+          $ref: '#/components/schemas/EventStatus'
+        ciId:
+          type: string
+          format: uuid
+        sourceId:
+          type: string
+          format: uuid
+
+    EventPatch:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/EventStatus'
+        severity:
+          $ref: '#/components/schemas/Severity'
+        assignedUserId:
+          type: string
+          format: uuid
+          nullable: true
+        title:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        itsmIncidentNumber:
+          type: string
+
+    EventActionRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          $ref: '#/components/schemas/EventActionType'
+        comment:
+          type: string
+          description: Required for `comment`; optional for other actions
+        assignedUserId:
+          type: string
+          format: uuid
+          description: Override assignee for `take`
+
+    EventActionResult:
+      type: object
+      properties:
+        event:
+          $ref: '#/components/schemas/Event'
+        logEntry:
+          $ref: '#/components/schemas/EventActionLog'
+
+    EventActionLog:
+      type: object
+      required: [id, eventId, action, userName, timestamp, details]
+      properties:
+        id:
+          type: string
+          format: uuid
+        eventId:
+          type: string
+          format: uuid
+        action:
+          type: string
+        userName:
+          type: string
+        userId:
+          type: string
+          format: uuid
+        timestamp:
+          type: string
+          format: date-time
+        details:
+          type: string
+
+    EventHistoryEntry:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        field:
+          type: string
+        oldValue:
+          type: string
+        newValue:
+          type: string
+        userName:
+          type: string
+
+    EventPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        page:
+          $ref: '#/components/schemas/PageMeta'
+
+    RawEvent:
+      allOf:
+        - $ref: '#/components/schemas/Event'
+        - type: object
+          properties:
+            isRaw:
+              type: boolean
+              default: true
+            processed:
+              type: boolean
+            processedEventId:
+              type: string
+              format: uuid
+            ingestBatchId:
+              type: string
+              format: uuid
+
+    RawEventPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RawEvent'
+        page:
+          $ref: '#/components/schemas/PageMeta'
+
+  # --- Adapters runtime ---
+    AdapterRuntimeResponse:
+      type: object
+      required: [service, sources]
+      properties:
+        service:
+          $ref: '#/components/schemas/AdapterServiceRuntime'
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceAdapterRuntime'
+
+    AdapterServiceRuntime:
+      type: object
+      required: [status, baseUrl]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, down]
+          description: Adapter process health (`down` when health endpoint unreachable)
+        version:
+          type: string
+          description: Deployed adapter version
+        database:
+          type: string
+          enum: [up, down]
+        fmModule:
+          type: string
+          enum: [reachable, unreachable, unknown]
+        bufferedMessages:
+          type: integer
+          minimum: 0
+        baseUrl:
+          type: string
+          format: uri
+          description: Configured adapter base URL used for this aggregation
+
+    SourceAdapterRuntime:
+      type: object
+      required:
+        - sourceId
+        - name
+        - type
+        - configStatus
+        - adapterRuntimeStatus
+      properties:
+        sourceId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/SourceType'
+        configStatus:
+          $ref: '#/components/schemas/SourceStatus'
+        adapterRuntimeStatus:
+          type: string
+          enum: [running, idle, stopped, degraded, unreachable]
+        adapterVersion:
+          type: string
+        lastSuccessAt:
+          type: string
+          format: date-time
+
+  # --- Sources ---
+    EventSource:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - protocol
+        - endpoint
+        - apiKey
+        - adapterVersion
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/SourceType'
+        protocol:
+          type: string
+        endpoint:
+          type: string
+        apiKey:
+          type: string
+          description: Masked in responses (e.g. `zk-****-mos-7f3a`)
+        adapterVersion:
+          type: string
+        lastSuccessAt:
+          type: string
+          format: date-time
+        status:
+          $ref: '#/components/schemas/SourceStatus'
+        schedule:
+          type: string
+          description: CRON for pull_etl sources
+
+    EventSourceDetail:
+      allOf:
+        - $ref: '#/components/schemas/EventSource'
+        - type: object
+          properties:
+            filterRules:
+              type: object
+              additionalProperties: true
+            parserConfig:
+              type: object
+              additionalProperties: true
+            webhookUrl:
+              type: string
+              description: Public adapter webhook URL
+
+    EventSourceCreate:
+      type: object
+      required: [name, type, protocol, endpoint]
+      properties:
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/SourceType'
+        protocol:
+          type: string
+        endpoint:
+          type: string
+        schedule:
+          type: string
+        filterRules:
+          type: object
+          additionalProperties: true
+        parserConfig:
+          type: object
+          additionalProperties: true
+        status:
+          $ref: '#/components/schemas/SourceStatus'
+          default: inactive
+
+    EventSourcePatch:
+      type: object
+      properties:
+        name:
+          type: string
+        protocol:
+          type: string
+        endpoint:
+          type: string
+        schedule:
+          type: string
+        status:
+          $ref: '#/components/schemas/SourceStatus'
+        filterRules:
+          type: object
+          additionalProperties: true
+        parserConfig:
+          type: object
+          additionalProperties: true
+        regenerateApiKey:
+          type: boolean
+
+    SourceTestRequest:
+      type: object
+      properties:
+        ingestApiKey:
+          type: string
+          description: |
+            Plain-text source API key from create/regenerate (held in UI sessionStorage).
+            Required for a real probe when the key is not persisted in fm-module.
+
+    SourceTestResult:
+      type: object
+      required: [success, testedAt]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        testedAt:
+          type: string
+          format: date-time
+        probeEventId:
+          type: string
+          format: uuid
+        delivery:
+          type: string
+          enum: [forwarded, buffered, failed]
+          description: Adapter probe delivery mode (mirrors adapter `ProbeResponse.delivery`)
+        latencyMs:
+          type: integer
+          minimum: 0
+          description: Round-trip latency reported by adapter probe
+
+    BindSimulatorRequest:
+      type: object
+      required: [ingestApiKey]
+      properties:
+        ingestApiKey:
+          type: string
+          description: Plain-text source API key (`X-Source-Key`) passed to zabbix-simulator `/config`
+
+    BindSimulatorResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        sourceWebhookKey:
+          type: string
+          description: Public webhook path key for this source
+        adapterWebhookUrl:
+          type: string
+          format: uri
+          description: Resolved adapter webhook URL configured on simulator
+        simulatorEnabled:
+          type: boolean
+          description: Whether auto-tick is enabled on simulator after bind
+
+    SourceSimulatorStatus:
+      type: object
+      required: [reachable, bound, enabled]
+      properties:
+        reachable:
+          type: boolean
+          description: zabbix-simulator health endpoint responded
+        bound:
+          type: boolean
+          description: Simulator runtime config targets this source's webhook key
+        enabled:
+          type: boolean
+          description: Auto-tick enabled (`SIMULATOR_ENABLED` / `POST /control`)
+        sourceWebhookKey:
+          type: string
+        adapterWebhookUrl:
+          type: string
+          format: uri
+        simulatorBaseUrl:
+          type: string
+          format: uri
+        activeProblems:
+          type: integer
+          minimum: 0
+          description: Active problem scenarios awaiting recovery on simulator
+        message:
+          type: string
+          description: Human-readable status or error hint
+
+    SourceSimulatorTickResult:
+      type: object
+      required: [kind, delivered]
+      properties:
+        kind:
+          type: string
+          enum: [problem, recovery, skip, error]
+          description: |
+            `problem` / `recovery` — webhook sent;
+            `skip` — simulator disabled;
+            `error` — delivery or configuration failure
+        scenarioId:
+          type: string
+          nullable: true
+        delivered:
+          type: boolean
+          description: Adapter accepted webhook (HTTP 2xx)
+        httpStatus:
+          type: integer
+          nullable: true
+          description: HTTP status from adapter webhook
+        error:
+          type: string
+          nullable: true
+        note:
+          type: string
+          nullable: true
+
+    SourceSimulatorControlRequest:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+          description: Whether zabbix-simulator should run periodic auto-tick
+
+    SourceSimulatorControlResult:
+      type: object
+      required: [success, enabled]
+      properties:
+        success:
+          type: boolean
+        enabled:
+          type: boolean
+          description: Auto-tick state after `POST /control` on simulator
+        message:
+          type: string
+          description: Human-readable status from simulator
+
+    SourceRunLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [success, failed, running]
+        recordsFetched:
+          type: integer
+        errorMessage:
+          type: string
+
+    InternalSourceConfig:
+      type: object
+      required: [sourceId, apiKeyHash, status, filterRules]
+      properties:
+        sourceId:
+          type: string
+          format: uuid
+        apiKeyHash:
+          type: string
+        status:
+          $ref: '#/components/schemas/SourceStatus'
+        filterRules:
+          type: object
+          additionalProperties: true
+        endpoint:
+          type: string
+        type:
+          $ref: '#/components/schemas/SourceType'
+        updatedAt:
+          type: string
+          format: date-time
+
+  # --- Rules ---
+    ProcessingRule:
+      type: object
+      required:
+        - id
+        - name
+        - ruleType
+        - enabled
+        - triggerType
+        - approvalStatus
+        - description
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        ruleType:
+          $ref: '#/components/schemas/RuleType'
+        enabled:
+          type: boolean
+        triggerType:
+          type: string
+          example: Событие потока
+        lastRunAt:
+          type: string
+          format: date-time
+        approvalStatus:
+          $ref: '#/components/schemas/ApprovalStatus'
+        description:
+          type: string
+
+    ProcessingRuleDetail:
+      allOf:
+        - $ref: '#/components/schemas/ProcessingRule'
+        - type: object
+          properties:
+            canvas:
+              $ref: '#/components/schemas/RuleCanvas'
+            versions:
+              type: array
+              items:
+                $ref: '#/components/schemas/RuleVersion'
+
+    ProcessingRuleCreate:
+      type: object
+      required: [name, ruleType, triggerType]
+      properties:
+        name:
+          type: string
+        ruleType:
+          $ref: '#/components/schemas/RuleType'
+        triggerType:
+          type: string
+        description:
+          type: string
+        canvas:
+          $ref: '#/components/schemas/RuleCanvas'
+
+    ProcessingRulePatch:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        triggerType:
+          type: string
+        enabled:
+          type: boolean
+          description: Enable or disable rule. When set to true, canvas validation runs if the rule has nodes.
+        canvas:
+          $ref: '#/components/schemas/RuleCanvas'
+
+    RuleBlockType:
+      type: string
+      enum: [trigger, condition, switch, dedup, threshold, correlation, notify, push, status]
+      description: |
+        Canvas node type. **Runtime-supported:** `trigger`, `condition`, `switch`, `dedup`,
+        `threshold`, `correlation`, `notify`, `push`. `notify` records outbound intent only
+        (stub — no real SMTP/Telegram in MVP+). `push` persists in-app notifications for UI polling.
+        `status` is stored but not executed (post-MVP).
+
+    RuleTriggerType:
+      type: string
+      enum: [stream, fm]
+      description: |
+        Trigger subtype in `data.triggerType`. Only `stream` is required for a valid canvas
+        and executed at runtime. `fm` is reserved (post-MVP).
+
+    RuleConditionField:
+      type: string
+      enum: [severity, title, status, nodeFqdn]
+
+    RuleConditionOperator:
+      type: string
+      enum: [eq, ne, contains]
+
+    RuleCorrelationMatchField:
+      type: string
+      enum: [title, severity, source]
+      description: Optional field used to group events in the correlation window
+
+    NotifyChannel:
+      type: string
+      enum: [telegram, email]
+      description: Outbound channel for the notify canvas block
+
+    RuleCanvasNode:
+      type: object
+      required: [id, type]
+      properties:
+        id:
+          type: string
+        type:
+          $ref: '#/components/schemas/RuleBlockType'
+        position:
+          type: object
+          properties:
+            x:
+              type: number
+            y:
+              type: number
+        data:
+          type: object
+          description: |
+            Block label and type-specific config (mirrors frontend `RuleBlock.config`).
+
+            | `type` | `data` keys | Notes |
+            |--------|-------------|-------|
+            | `trigger` | `triggerType` (`stream` \| `fm`), `label` | `stream` required for valid canvas |
+            | `condition` | `field`, `operator`, `value`, `label` | `field` ∈ severity, title, status, nodeFqdn; `operator` ∈ eq, ne, contains |
+            | `switch` | `label` | First matching outgoing branch continues traversal |
+            | `dedup` | `key`, `label` | Optional merge key; default source+title+CI |
+            | `threshold` | `count`, `windowMin`, `label` | Sliding window per source+CI |
+            | `correlation` | `count`, `windowMin`, `matchField`, `label` | Links events as root/child when count reached in window |
+            | `notify` | `channel` (`telegram` \| `email`), `emailAddress`, `label` | `emailAddress` required when `channel=email`; runtime stub (no real send in MVP+) |
+            | `push` | `message`, `label` | In-app toast; `message` supports `{title}`, `{severity}` placeholders |
+            | `status` | `status`, `label` | Post-MVP; not executed at runtime |
+          additionalProperties: true
+
+    RuleCanvasEdge:
+      type: object
+      required: [id, source, target]
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+          description: Source node id
+        target:
+          type: string
+          description: Target node id
+        label:
+          type: string
+          description: Optional branch label for switch outgoing edges (default branch when omitted)
+
+    RuleCanvas:
+      type: object
+      description: |
+        Visual rule builder graph (Monq BP-style). Persisted on create/update; interpreted
+        at runtime for enabled rules. Empty `nodes` falls back to legacy `ruleType` behavior.
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleCanvasNode'
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleCanvasEdge'
+
+    RuleVersion:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        versionNumber:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        createdByUserName:
+          type: string
+        comment:
+          type: string
+        canvas:
+          $ref: '#/components/schemas/RuleCanvas'
+
+    PushNotification:
+      type: object
+      required: [id, ruleId, eventId, title, message, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        ruleId:
+          type: string
+          format: uuid
+          description: Processing rule whose push block created this notification
+        eventId:
+          type: string
+          format: uuid
+          description: Console event that triggered the push block
+        title:
+          type: string
+          description: Event title shown in toast header
+        message:
+          type: string
+          description: Rendered message from push block template
+        createdAt:
+          type: string
+          format: date-time
+
+    PushNotificationList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PushNotification'
+
+  # --- Health ---
+    ProductHealth:
+      type: object
+      required: [id, name, tenant, site, maxSeverity, activeEventCount, ciIds, tags]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        tenant:
+          type: string
+        site:
+          type: string
+        maxSeverity:
+          $ref: '#/components/schemas/Severity'
+        activeEventCount:
+          type: integer
+        ciIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        tags:
+          type: array
+          items:
+            type: string
+
+    ProductHealthDetail:
+      allOf:
+        - $ref: '#/components/schemas/ProductHealth'
+        - type: object
+          properties:
+            configurationItems:
+              type: array
+              items:
+                $ref: '#/components/schemas/ConfigurationItem'
+            activeEvents:
+              type: array
+              items:
+                $ref: '#/components/schemas/Event'
+            severityBreakdown:
+              type: object
+              additionalProperties:
+                type: integer
+
+    CiHealthProfile:
+      type: object
+      required:
+        - ciId
+        - currentHealth
+        - healthPercent
+        - minToday
+        - minTodayPercent
+        - maxToday
+        - maxTodayPercent
+        - components
+        - dependents
+        - signalsBySeverity
+        - timeline
+      properties:
+        ciId:
+          type: string
+          format: uuid
+        currentHealth:
+          $ref: '#/components/schemas/HealthLevel'
+        healthPercent:
+          type: number
+        minToday:
+          $ref: '#/components/schemas/HealthLevel'
+        minTodayPercent:
+          type: number
+        maxToday:
+          $ref: '#/components/schemas/HealthLevel'
+        maxTodayPercent:
+          type: number
+        components:
+          type: array
+          items:
+            $ref: '#/components/schemas/CiComponentHealth'
+        dependents:
+          type: array
+          items:
+            $ref: '#/components/schemas/DependentCi'
+        signalsBySeverity:
+          type: object
+          properties:
+            fatal:
+              type: integer
+            critical:
+              type: integer
+            major:
+              type: integer
+            minor:
+              type: integer
+            warning:
+              type: integer
+            normal:
+              type: integer
+        timeline:
+          type: array
+          items:
+            $ref: '#/components/schemas/HealthTimelinePoint'
+
+    CiComponentHealth:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        health:
+          $ref: '#/components/schemas/HealthLevel'
+        healthPercent:
+          type: number
+        damageFromComponents:
+          type: number
+        damageFromInfluence:
+          type: number
+
+    DependentCi:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        fqdn:
+          type: string
+        componentName:
+          type: string
+        health:
+          $ref: '#/components/schemas/HealthLevel'
+        healthPercent:
+          type: number
+        influenceType:
+          $ref: '#/components/schemas/InfluenceType'
+
+    HealthTimelinePoint:
+      type: object
+      properties:
+        time:
+          type: string
+        percent:
+          type: number
+        level:
+          $ref: '#/components/schemas/HealthLevel'
+
+  # --- Console maps ---
+    EventMap:
+      type: object
+      required: [id, name, query, isSystem, isPersonal, columns]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        query:
+          type: string
+        isSystem:
+          type: boolean
+        isPersonal:
+          type: boolean
+        columns:
+          type: array
+          items:
+            type: string
+        unsaved:
+          type: boolean
+          description: Client-side draft flag (not persisted)
+
+    EventMapCreate:
+      type: object
+      required: [name, query, columns]
+      properties:
+        name:
+          type: string
+        query:
+          type: string
+        columns:
+          type: array
+          items:
+            type: string
+        isPersonal:
+          type: boolean
+          default: true
+
+    EventMapPatch:
+      type: object
+      properties:
+        name:
+          type: string
+        query:
+          type: string
+        columns:
+          type: array
+          items:
+            type: string
+
+  # --- CMDB ---
+    ConfigurationItem:
+      type: object
+      required: [id, fqdn, ciType, system, subsystem, software, products, tags]
+      properties:
+        id:
+          type: string
+          format: uuid
+        fqdn:
+          type: string
+        ciType:
+          type: string
+        system:
+          type: string
+        subsystem:
+          type: string
+        software:
+          type: string
+        products:
+          type: array
+          items:
+            type: string
+            format: uuid
+        tags:
+          type: array
+          items:
+            type: string
+        externalIds:
+          type: object
+          additionalProperties:
+            type: string
+
+    ConfigurationItemCreate:
+      type: object
+      required: [fqdn, ciType, system]
+      properties:
+        fqdn:
+          type: string
+        ciType:
+          type: string
+        system:
+          type: string
+        subsystem:
+          type: string
+        software:
+          type: string
+        productIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        tags:
+          type: array
+          items:
+            type: string
+        externalIds:
+          type: object
+          additionalProperties:
+            type: string
+
+    ConfigurationItemPatch:
+      type: object
+      properties:
+        fqdn:
+          type: string
+        ciType:
+          type: string
+        system:
+          type: string
+        subsystem:
+          type: string
+        software:
+          type: string
+        productIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        tags:
+          type: array
+          items:
+            type: string
+        externalIds:
+          type: object
+          additionalProperties:
+            type: string
+
+    ConfigurationItemPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConfigurationItem'
+        page:
+          $ref: '#/components/schemas/PageMeta'
+
+    ProductAdmin:
+      type: object
+      required: [id, name, code, tenant, site, tags, ciIds]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        code:
+          type: string
+          description: Unique product code (max 64 chars)
+        tenant:
+          type: string
+        site:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        ciIds:
+          type: array
+          description: IDs of configuration items linked via `product_ci`
+          items:
+            type: string
+            format: uuid
+
+    ProductCreate:
+      type: object
+      required: [name, code, tenant, site]
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+          description: Unique product code (max 64 chars)
+        tenant:
+          type: string
+        site:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        ciIds:
+          type: array
+          description: Optional CI ids to link on create; each id must exist
+          items:
+            type: string
+            format: uuid
+
+    ProductPatch:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+          description: Unique product code (max 64 chars); must not duplicate another product
+        tenant:
+          type: string
+        site:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        ciIds:
+          type: array
+          description: |
+            When present, replaces all `product_ci` links for this product (empty array clears all).
+            When omitted, CI membership is unchanged. Each id must exist.
+          items:
+            type: string
+            format: uuid
+
+  # --- Settings ---
+    Settings:
+      type: object
+      required: [timezone, pollingIntervalSec, autoArchiveDays, repeatIntervalMin, wislaIntegration, itsmIntegration]
+      properties:
+        timezone:
+          type: string
+          example: Europe/Moscow
+        pollingIntervalSec:
+          type: integer
+          minimum: 5
+          maximum: 300
+        autoArchiveDays:
+          type: integer
+        repeatIntervalMin:
+          type: integer
+        wislaIntegration:
+          type: boolean
+        itsmIntegration:
+          type: boolean
+
+    UserPreferences:
+      type: object
+      properties:
+        sidebarCollapsed:
+          type: boolean
+        defaultMapId:
+          type: string
+          format: uuid
+        columnLayouts:
+          type: object
+          additionalProperties: true
+
+    SettingsBundle:
+      type: object
+      properties:
+        module:
+          $ref: '#/components/schemas/Settings'
+        profile:
+          $ref: '#/components/schemas/UserPreferences'
+
+    SettingsPatch:
+      type: object
+      properties:
+        module:
+          $ref: '#/components/schemas/Settings'
+        profile:
+          $ref: '#/components/schemas/UserPreferences'
+
+    NotificationSettings:
+      type: object
+      properties:
+        emailEnabled:
+          type: boolean
+        telegramEnabled:
+          type: boolean
+        rules:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    IntegrationSettings:
+      type: object
+      properties:
+        wisla:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            baseUrl:
+              type: string
+            apiToken:
+              type: string
+        itsm:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            endpoint:
+              type: string
+            mapping:
+              type: object
+              additionalProperties: true
+
+    ConsoleScope:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        tenant:
+          type: string
+        roleIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    ConsoleScopeCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        tenant:
+          type: string
+        roleIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+  # --- Dashboard ---
+    DashboardSummary:
+      type: object
+      properties:
+        severityCounts:
+          type: object
+          description: Active events (non-closed/archived) per severity
+          properties:
+            fatal:
+              type: integer
+            critical:
+              type: integer
+            major:
+              type: integer
+            minor:
+              type: integer
+            warning:
+              type: integer
+            normal:
+              type: integer
+        totalActive:
+          type: integer
+        productPreview:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductHealth'
+        systemMaps:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventMap'
+
+  # --- Downtime (post-MVP) ---
+    Downtime:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        scopeType:
+          type: string
+          enum: [ci, product, source]
+        scopeId:
+          type: string
+          format: uuid
+        scheduleType:
+          type: string
+          enum: [permanent, temporary]
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [scheduled, active, completed, cancelled]
+        suppressedActions:
+          type: array
+          items:
+            type: string
+
+    DowntimeCreate:
+      type: object
+      required: [name, scopeType, scopeId, scheduleType]
+      properties:
+        name:
+          type: string
+        scopeType:
+          type: string
+          enum: [ci, product, source]
+        scopeId:
+          type: string
+          format: uuid
+        scheduleType:
+          type: string
+          enum: [permanent, temporary]
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        suppressedActions:
+          type: array
+          items:
+            type: string
+
+    DowntimePatch:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [scheduled, active, completed, cancelled]
+        endsAt:
+          type: string
+          format: date-time
+
+security:
+  - bearerAuth: []

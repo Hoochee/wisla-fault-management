@@ -1,0 +1,214 @@
+@if (product) {
+  <div class="page">
+    <div class="top">
+      <div>
+        <a routerLink="/health" class="back">← Здоровье продуктов</a>
+        <h1>{{ product.name }}</h1>
+        <p class="subtitle">
+          @if (productAdmin?.code) {
+            <span class="code">{{ productAdmin!.code }}</span> ·
+          }
+          {{ product.tenant }} · {{ product.site }}
+        </p>
+      </div>
+      <div class="top-actions">
+        @if (isAdmin()) {
+          <button type="button" class="btn" (click)="openEditProduct()">Редактировать</button>
+          <button type="button" class="btn-danger" (click)="confirmDeleteProduct()">Удалить продукт</button>
+        }
+        <div class="stats">
+          <app-severity-badge [severity]="product.maxSeverity" />
+          <div class="count">{{ product.activeEventCount }}</div>
+          <div class="hint">активных событий</div>
+        </div>
+      </div>
+    </div>
+
+    <section class="composition">
+      <div class="section-head">
+        <h2>Состав продукта</h2>
+        @if (isAdmin()) {
+          <button type="button" class="btn-primary" (click)="openCiPicker()">+ Добавить КЕ</button>
+        }
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>FQDN</th>
+            <th>Тип</th>
+            <th>Система</th>
+            <th>Подсистема</th>
+            @if (isAdmin()) {
+              <th></th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (ci of ciList; track ci.id) {
+            <tr>
+              <td class="mono">{{ ci.fqdn }}</td>
+              <td>{{ ci.ciType }}</td>
+              <td>{{ ci.system }}</td>
+              <td>{{ ci.subsystem }}</td>
+              @if (isAdmin()) {
+                <td class="actions">
+                  <button type="button" class="link-btn danger" (click)="unlinkCi(ci.id)">Отвязать</button>
+                </td>
+              }
+            </tr>
+          } @empty {
+            <tr>
+              <td [attr.colspan]="isAdmin() ? 5 : 4" class="empty-row">Нет связанных КЕ</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+
+    <div class="ci-strip">
+      @for (ci of ciList; track ci.id) {
+        <button
+          type="button"
+          class="ci-chip"
+          [class.selected]="selectedCiId === ci.id"
+          (click)="selectCi(ci.id)"
+        >
+          <div class="fqdn">{{ ci.fqdn }}</div>
+          @if (profiles[ci.id]; as h) {
+            <app-health-badge [level]="h.currentHealth" [percent]="h.healthPercent" [compact]="true" />
+          }
+        </button>
+      }
+    </div>
+
+    <div class="operative">
+      <app-ci-sidebar
+        [product]="product"
+        [ciList]="ciList"
+        [selectedCiId]="selectedCiId"
+        [profiles]="profiles"
+        (selectCi)="selectCi($event)"
+      />
+      <div class="operative-main">
+        <app-operative-center-panel
+          [product]="product"
+          [ciList]="ciList"
+          [selectedCiId]="selectedCiId"
+          [profiles]="profiles"
+          [events]="events"
+          defaultTab="health"
+        />
+      </div>
+    </div>
+
+    <div class="tags">
+      @for (tag of product.tags; track tag) {
+        <span class="tag">{{ tag }}</span>
+      }
+    </div>
+  </div>
+} @else {
+  <div class="empty">
+    <p>Продукт не найден</p>
+    <a routerLink="/health">← Назад</a>
+  </div>
+}
+
+@if (editModalOpen()) {
+  <div class="overlay" (click)="closeEditModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h2>Редактирование продукта</h2>
+      <form (ngSubmit)="saveProductAttributes()">
+        <div class="form-field">
+          <label for="edit-product-name">Название</label>
+          <input id="edit-product-name" type="text" [(ngModel)]="form.name" name="name" required />
+        </div>
+        <div class="form-field">
+          <label for="edit-product-code">Код</label>
+          <input id="edit-product-code" type="text" [(ngModel)]="form.code" name="code" required />
+        </div>
+        <div class="form-field">
+          <label for="edit-product-tenant">Тенант</label>
+          <input id="edit-product-tenant" type="text" [(ngModel)]="form.tenant" name="tenant" required />
+        </div>
+        <div class="form-field">
+          <label for="edit-product-site">Площадка</label>
+          <input id="edit-product-site" type="text" [(ngModel)]="form.site" name="site" required />
+        </div>
+        <div class="form-field">
+          <label for="edit-product-tags">Теги (через запятую)</label>
+          <input id="edit-product-tags" type="text" [(ngModel)]="form.tagsText" name="tagsText" />
+        </div>
+        @if (formError()) {
+          <p class="error">{{ formError() }}</p>
+        }
+        <div class="modal-actions">
+          <button type="button" class="btn" (click)="closeEditModal()">Отмена</button>
+          <button type="submit" class="btn-primary" [disabled]="saving()">Сохранить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+@if (ciPickerOpen()) {
+  <div class="overlay" (click)="closeCiPicker()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h2>Добавить КЕ</h2>
+      <div class="form-field">
+        <label for="ci-picker-search">Поиск по FQDN</label>
+        <input
+          id="ci-picker-search"
+          type="search"
+          [(ngModel)]="ciSearch"
+          name="ciSearch"
+          placeholder="Введите FQDN"
+        />
+      </div>
+      <div class="ci-list">
+        @for (ci of filteredCis(); track ci.id) {
+          <label class="ci-option">
+            <input
+              type="checkbox"
+              [checked]="isPickerCiSelected(ci.id)"
+              (change)="togglePickerCi(ci.id, $any($event.target).checked)"
+            />
+            <span class="mono">{{ ci.fqdn }}</span>
+          </label>
+        }
+      </div>
+      @if (formError()) {
+        <p class="error">{{ formError() }}</p>
+      }
+      <div class="modal-actions">
+        <button type="button" class="btn" (click)="closeCiPicker()">Отмена</button>
+        <button type="button" class="btn-primary" [disabled]="saving()" (click)="saveCiLinks()">Сохранить</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (deleteTarget()) {
+  <div class="overlay" (click)="deleteTarget.set(false)">
+    <div class="modal modal-sm" (click)="$event.stopPropagation()">
+      <h2>Удалить продукт?</h2>
+      <p>«{{ product?.name }}» будет удалён безвозвратно.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn" (click)="deleteTarget.set(false)">Отмена</button>
+        <button type="button" class="btn-danger" (click)="deleteProduct()">Удалить</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (deleteBlocked()) {
+  <div class="overlay" (click)="deleteBlocked.set(false)">
+    <div class="modal modal-sm" (click)="$event.stopPropagation()">
+      <h2>Невозможно удалить</h2>
+      <p>Сначала отвяжите КЕ в блоке «Состав продукта».</p>
+      <div class="modal-actions">
+        <button type="button" class="btn-primary" (click)="deleteBlocked.set(false)">Понятно</button>
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,309 @@
+openapi: 3.1.0
+info:
+  title: WISLA FM — API Gateway (BFF consolidation)
+  version: 1.0.0
+  description: |
+    **MVP:** отдельный API Gateway не развёртывается. Этот документ — единая точка входа для фронтенда
+    и маршрутизация между `fm-module` (:8080), `adapter` (:8081) и `zabbix-simulator` (:8082).
+
+    - Браузер → `http://localhost:8080` — Angular SPA + `/api/v1/*` (fm-module BFF)
+    - Внешние Push-источники → `http://localhost:8081/webhook/{sourceKey}` (adapter)
+    - adapter → `http://localhost:8080/api/v1/ingest?sourceKey={key}` (fm-module)
+    - zabbix-simulator → `http://localhost:8082` — dev/demo; шлёт webhook на adapter.
+      Runtime `/config` и `/control` вызываются fm-module; UI использует fm-module proxy endpoints.
+
+    Детальные контракты:
+    - `docs/fm-module/api.yaml` — все UI и ingest endpoints
+    - `docs/adapter/api.yaml` — webhook и internal adapter endpoints
+    - `docs/zabbix-simulator/api.yaml` — control API симулятора Zabbix (demo/ops)
+
+servers:
+  - url: http://localhost:8080
+    description: fm-module BFF (SPA + REST)
+  - url: http://localhost:8081
+    description: adapter (webhook only, внешние источники)
+  - url: http://localhost:8082
+    description: zabbix-simulator (demo traffic, прямой доступ curl)
+
+x-routing:
+  mvp:
+    spa:
+      upstream: fm-module
+      port: 8080
+      paths: ["/*"]
+      note: Angular static; fallback index.html для client routes
+    api:
+      upstream: fm-module
+      port: 8080
+      prefix: /api/v1
+      auth: JWT Bearer (кроме ingest и login)
+    ingest:
+      upstream: fm-module
+      port: 8080
+      path: POST /api/v1/ingest
+      auth: X-Api-Key или sourceKey query (сервис адаптера / источник)
+    webhook:
+      upstream: adapter
+      port: 8081
+      path: POST /webhook/{sourceKey}
+      auth: X-Source-Key или sourceKey в path
+    zabbixSimulator:
+      upstream: zabbix-simulator
+      port: 8082
+      x-source-spec: docs/zabbix-simulator/api.yaml
+      paths:
+        - GET /health
+        - GET /scenarios
+        - POST /tick
+        - POST /scenarios/{id}/fire
+        - POST /config
+        - POST /control
+      note: |
+        Прямой доступ (curl/ops) на :8082. UI демо-блок источника идёт через fm-module:
+        `POST /api/v1/sources/{id}/bind-simulator`, `send-test-event`, `GET simulator-status`.
+        fm-module вызывает simulator `/config`, `/control`, `/tick` по `ZABBIX_SIMULATOR_BASE_URL`.
+        Исходящий трафик: POST adapter:8081/webhook/{sourceKey} (X-Source-Key).
+  production:
+    note: nginx TLS termination; опционально единый baseUrl; Kafka между adapter и fm-module
+
+paths:
+  /api/v1/{proxy+}:
+    x-upstream: http://fm-module:8080
+    x-source-spec: docs/fm-module/api.yaml
+    x-description: Все REST-операции UI и ingest. Проксируется на fm-module без изменения path.
+    get:
+      summary: Proxy to fm-module (all /api/v1 routes)
+      operationId: proxyFmModule
+      parameters:
+        - name: proxy
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Proxied response — see docs/fm-module/api.yaml
+
+  /webhook/{sourceKey}:
+    x-upstream: http://adapter:8081
+    x-source-spec: docs/adapter/api.yaml
+    post:
+      summary: Внешний Push webhook (Zabbix, AlertManager)
+      operationId: externalWebhook
+      servers:
+        - url: http://localhost:8081
+      security:
+        - sourceKeyAuth: []
+      parameters:
+        - name: sourceKey
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '202':
+          description: Принято (доставлено или буферизовано адаптером)
+
+  /scenarios:
+    x-upstream: http://zabbix-simulator:8082
+    x-source-spec: docs/zabbix-simulator/api.yaml
+    get:
+      summary: Список встроенных сценариев Zabbix (simulator)
+      operationId: listSimulatorScenarios
+      servers:
+        - url: http://localhost:8082
+      security: []
+      responses:
+        '200':
+          description: Каталог сценариев — см. docs/zabbix-simulator/api.yaml
+
+  /tick:
+    x-upstream: http://zabbix-simulator:8082
+    x-source-spec: docs/zabbix-simulator/api.yaml
+    post:
+      summary: Выполнить один тик симулятора (problem или recovery)
+      operationId: simulatorTick
+      servers:
+        - url: http://localhost:8082
+      security: []
+      responses:
+        '200':
+          description: Результат отправки webhook — см. docs/zabbix-simulator/api.yaml
+
+  /scenarios/{id}/fire:
+    x-upstream: http://zabbix-simulator:8082
+    x-source-spec: docs/zabbix-simulator/api.yaml
+    post:
+      summary: Принудительно выполнить сценарий симулятора
+      operationId: fireSimulatorScenario
+      servers:
+        - url: http://localhost:8082
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: recovery
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Результат отправки webhook — см. docs/zabbix-simulator/api.yaml
+
+  /health:
+    get:
+      summary: Gateway / BFF health (fm-module)
+      description: |
+        Агрегированный health BFF. Поле `services.zabbixSimulator` — опциональный статус dev-сервиса на :8082.
+        Отдельный health симулятора: `GET http://localhost:8082/health` (см. `docs/zabbix-simulator/api.yaml`).
+      operationId: gatewayHealth
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  services:
+                    type: object
+                    properties:
+                      fmModule:
+                        type: string
+                        example: up
+                      adapter:
+                        type: string
+                        example: up
+                      zabbixSimulator:
+                        type: string
+                        description: Опционально; статус dev/demo-сервиса на :8082
+                        example: up
+                      postgresql:
+                        type: string
+                        example: up
+
+# Сводка маршрутов UI → API (MVP)
+x-ui-route-map:
+  - ui: "(ops/demo — не Angular)"
+    api: GET http://localhost:8082/health, GET /scenarios, POST /tick, POST /scenarios/{id}/fire, POST /config, POST /control
+    auth: none
+    note: zabbix-simulator — curl/ops; UI использует fm-module proxy на карточке источника
+  - ui: POST /login
+    api: POST /api/v1/auth/login
+    auth: none
+  - ui: GET /
+    api: GET /api/v1/dashboard/summary
+    auth: JWT
+  - ui: GET /health
+    api: GET /api/v1/health/products
+    auth: JWT
+  - ui: GET /health/:productId
+    api: GET /api/v1/health/products/{id}
+    auth: JWT
+  - ui: GET /events/raw
+    api: GET /api/v1/raw-events
+    auth: JWT
+  - ui: GET /console
+    api: GET /api/v1/events, GET /api/v1/console/maps
+    auth: JWT
+  - ui: GET /console/:eventId
+    api: GET /api/v1/events/{id}, POST /api/v1/events/{id}/actions
+    auth: JWT
+  - ui: GET /sources
+    api: GET /api/v1/sources, GET /api/v1/adapters/runtime
+    auth: JWT
+  - ui: POST /sources/:id/test
+    api: POST /api/v1/sources/{id}/test
+    auth: JWT
+    note: Body `{ ingestApiKey? }` from sessionStorage after create/regenerate
+  - ui: GET /sources/:id (demo block)
+    api: |
+      POST /api/v1/sources/{id}/bind-simulator,
+      POST /api/v1/sources/{id}/send-test-event,
+      GET /api/v1/sources/{id}/simulator-status
+    auth: JWT
+    note: bind-simulator body `{ ingestApiKey }`; proxies zabbix-simulator runtime API
+  - ui: GET /rules
+    api: GET /api/v1/rules
+    auth: JWT
+  - ui: GET /rules/:id
+    api: GET /api/v1/rules/{id}, PATCH /api/v1/rules/{id}
+    auth: JWT
+  - ui: GET /admin/users
+    api: GET /api/v1/admin/users
+    auth: JWT
+  - ui: GET /admin/roles
+    api: GET /api/v1/admin/roles
+    auth: JWT
+  - ui: GET /admin/ci
+    api: GET /api/v1/admin/configuration-items
+    auth: JWT
+  - ui: GET /admin/search-folders
+    api: GET /api/v1/console/maps
+    auth: JWT
+  - ui: GET /settings
+    api: GET /api/v1/settings
+    auth: JWT
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Пользовательский JWT после POST /api/v1/auth/login
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: Ingest от adapter / сервисной учётной записи
+    sourceKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Source-Key
+      description: Webhook внешнего источника на adapter
+
+security:
+  - bearerAuth: []
+
+x-cors:
+  allowedOrigins:
+    - http://localhost:8080
+  allowedMethods: [GET, POST, PATCH, DELETE, OPTIONS]
+  allowedHeaders: [Authorization, Content-Type, X-Api-Key, X-Source-Key]
+  credentials: true
+
+x-auth-matrix:
+  public:
+    - POST /api/v1/auth/login
+    - GET /health
+    - POST /webhook/{sourceKey}
+    - GET /health (zabbix-simulator, :8082, dev only)
+    - GET /scenarios (zabbix-simulator, dev only)
+    - POST /tick (zabbix-simulator, dev only)
+    - POST /scenarios/{id}/fire (zabbix-simulator, dev only)
+    - POST /config (zabbix-simulator, dev only — также вызывается fm-module)
+    - POST /control (zabbix-simulator, dev only — также вызывается fm-module)
+  service:
+    - POST /api/v1/ingest
+    - GET /api/v1/internal/sources/{id}/config
+    - GET /internal/sources/{sourceId}/config (adapter)
+    - POST /internal/probe (adapter)
+  jwt:
+    - /api/v1/**

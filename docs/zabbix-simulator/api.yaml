@@ -1,0 +1,355 @@
+openapi: 3.1.0
+info:
+  title: WISLA FM Zabbix Simulator API
+  version: 1.0.0
+  description: |
+    Dev/demo-сервис имитации **Zabbix 6.x webhook** для MVP без реального Zabbix Server.
+    Периодически или по запросу отправляет JSON в формате Zabbix Media Type на adapter
+    (`POST /webhook/{sourceKey}`).
+
+    **Bounded context:** Demo traffic generator (`backend/zabbix-simulator/`).
+    **Порт:** `8082` — не проксируется через fm-module; прямой доступ (curl, ops).
+
+    См. также `docs/zabbix-simulator.md`.
+
+servers:
+  - url: http://localhost:8082
+    description: Local development (zabbix-simulator)
+
+tags:
+  - name: health
+    description: Проверка работоспособности
+  - name: scenarios
+    description: Встроенные сценарии алертов
+  - name: control
+    description: Ручной запуск тиков (demo/ops)
+  - name: runtime
+    description: Runtime-конфигурация из fm-module (demo)
+
+paths:
+  /config:
+    post:
+      tags: [runtime]
+      summary: Применить runtime-конфигурацию источника (из fm-module)
+      description: |
+        Обновляет mutable overlay поверх env-переменных: `SOURCE_WEBHOOK_KEY`, `ZABBIX_SOURCE_API_KEY`,
+        `ADAPTER_BASE_URL`. Вызывается fm-module при `POST /api/v1/sources/{id}/bind-simulator`.
+        Не требует аутентификации — dev/demo only; в production сеть должна ограничивать доступ.
+      operationId: applyRuntimeConfig
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuntimeConfigRequest'
+      responses:
+        '200':
+          description: Конфигурация применена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuntimeConfigResponse'
+        '400':
+          description: Невалидный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /control:
+    post:
+      tags: [runtime]
+      summary: Включить или выключить автотик симулятора
+      description: |
+        Переключает `SIMULATOR_ENABLED` в runtime overlay. UI fm-module может проксировать
+        этот вызов при переключении «Автотик» на карточке источника.
+      operationId: setSimulatorControl
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ControlRequest'
+      responses:
+        '200':
+          description: Состояние автотика обновлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlResponse'
+
+  /health:
+    get:
+      tags: [health]
+      summary: Health check симулятора
+      operationId: getSimulatorHealth
+      security: []
+      responses:
+        '200':
+          description: Сервис доступен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /scenarios:
+    get:
+      tags: [scenarios]
+      summary: Список встроенных сценариев
+      operationId: listScenarios
+      security: []
+      responses:
+        '200':
+          description: Каталог сценариев
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScenarioSummary'
+
+  /tick:
+    post:
+      tags: [control]
+      summary: Выполнить один автотик (problem или recovery)
+      description: |
+        Имитирует периодический тик планировщика: с вероятностью `SIMULATOR_RECOVERY_PROBABILITY`
+        отправляет recovery для активной проблемы, иначе — случайный problem-сценарий.
+        При `SIMULATOR_ENABLED=false` возвращает `kind=skip`.
+      operationId: simulatorTick
+      security: []
+      responses:
+        '200':
+          description: Результат отправки webhook в adapter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationResult'
+
+  /scenarios/{id}/fire:
+    post:
+      tags: [control]
+      summary: Принудительно выполнить сценарий
+      description: |
+        Отправляет problem (`recovery=false`) или recovery (`recovery=true`) для указанного сценария.
+        Webhook доставляется на adapter (`ADAPTER_BASE_URL` + `/webhook/{SOURCE_WEBHOOK_KEY}`) с заголовком `X-Source-Key`. fm-module вызывается только adapter.
+      operationId: fireScenario
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ScenarioIdPath'
+        - $ref: '#/components/parameters/RecoveryQuery'
+      responses:
+        '200':
+          description: Результат отправки webhook в adapter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationResult'
+
+components:
+  parameters:
+    ScenarioIdPath:
+      name: id
+      in: path
+      required: true
+      description: Идентификатор встроенного сценария
+      schema:
+        type: string
+        example: cpu-high
+
+    RecoveryQuery:
+      name: recovery
+      in: query
+      required: false
+      description: `true` — recovery (event_value=0); `false` — problem (по умолчанию)
+      schema:
+        type: boolean
+        default: false
+        example: false
+
+  schemas:
+    RuntimeConfigRequest:
+      type: object
+      required: [sourceWebhookKey, apiKey]
+      properties:
+        sourceWebhookKey:
+          type: string
+          minLength: 1
+          description: Публичный ключ источника для path `/webhook/{sourceWebhookKey}` на adapter
+          example: zabbix-prod-01
+        apiKey:
+          type: string
+          minLength: 1
+          description: Секрет источника — заголовок `X-Source-Key` при отправке webhook
+          example: zk-demo-mos-7f3a9b2c
+
+    RuntimeConfigResponse:
+      type: object
+      required: [success, adapterWebhookUrl]
+      properties:
+        success:
+          type: boolean
+        adapterWebhookUrl:
+          type: string
+          format: uri
+          description: Resolved URL — `ADAPTER_BASE_URL` + `/webhook/{sourceWebhookKey}`
+          example: http://localhost:8081/webhook/zabbix-prod-01
+        sourceWebhookKey:
+          type: string
+        enabled:
+          type: boolean
+          description: Текущее значение auto-tick после применения конфига
+        message:
+          type: string
+
+    ControlRequest:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+          description: `true` — периодический автотик; `false` — только ручные `/tick` и `/scenarios/{id}/fire`
+
+    ControlResponse:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+    HealthResponse:
+      type: object
+      required: [status, service]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+          example: ok
+        service:
+          type: string
+          example: zabbix-simulator
+        enabled:
+          type: boolean
+          description: Значение `SIMULATOR_ENABLED`
+          example: true
+        adapter_base_url:
+          type: string
+          format: uri
+          example: http://localhost:8081
+        source_webhook_key:
+          type: string
+          example: zabbix-prod-01
+        adapter_webhook_url:
+          type: string
+          format: uri
+          description: Resolved URL — POST на adapter webhook
+          example: http://localhost:8081/webhook/zabbix-prod-01
+        delivery_chain:
+          type: array
+          items:
+            type: string
+        active_problems:
+          type: integer
+          minimum: 0
+          description: Число активных problem-сценариев (ожидают recovery)
+          example: 2
+        scenarios:
+          type: integer
+          minimum: 0
+          description: Общее число встроенных сценариев
+          example: 5
+
+    ScenarioSummary:
+      type: object
+      required: [id, host, trigger_name, trigger_severity, event_nseverity]
+      properties:
+        id:
+          type: string
+          example: disk-space
+        host:
+          type: string
+          example: db-prod-01.moscow.company.ru
+        trigger_name:
+          type: string
+          example: Disk space critically low on /var
+        trigger_severity:
+          type: string
+          example: Disaster
+        event_nseverity:
+          type: integer
+          minimum: 0
+          maximum: 5
+          description: Zabbix numeric severity (0–5)
+          example: 5
+
+    SimulationResult:
+      type: object
+      required: [kind, delivered]
+      properties:
+        kind:
+          type: string
+          enum: [problem, recovery, skip, error]
+          description: |
+            `problem` / `recovery` — webhook отправлен;
+            `skip` — симулятор отключён;
+            `error` — неизвестный сценарий или ошибка
+        scenarioId:
+          type: string
+          nullable: true
+          example: cpu-high
+        payload:
+          type: object
+          additionalProperties: true
+          description: JSON тела webhook (формат Zabbix 6.x Media Type)
+        delivered:
+          type: boolean
+          description: Успешная доставка в adapter (HTTP 2xx)
+        httpStatus:
+          type: integer
+          nullable: true
+          description: HTTP-статус ответа adapter
+          example: 202
+        error:
+          type: string
+          nullable: true
+          description: Сообщение об ошибке при `kind=error` или неуспешной доставке
+        note:
+          type: string
+          nullable: true
+          description: Пояснение при `kind=skip`
+
+    ZabbixWebhookPayload:
+      type: object
+      description: |
+        Пример полей webhook, отправляемых в adapter (см. `docs/zabbix-simulator.md`).
+        Адаптер не валидирует полную схему — принимает произвольный JSON.
+      additionalProperties: true
+      example:
+        host: demo-server.wisla.local
+        hostname: demo-server.wisla.local
+        host_ip: 10.10.1.21
+        trigger_id: "10001"
+        trigger_name: High CPU utilization (>90% for 5m)
+        trigger_severity: High
+        event_id: "10042"
+        event_nseverity: "4"
+        event_value: "1"
+        item_key: system.cpu.util[,idle]
+        item_value: "92.4"
+        message: CPU usage critical on demo-server.wisla.local
+        zabbix_url: https://zabbix.wisla.local
+
+security: []

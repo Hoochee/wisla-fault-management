@@ -1,0 +1,418 @@
+openapi: 3.1.0
+info:
+  title: WISLA FM Adapter API
+  version: 1.0.0
+  description: |
+    Сервис приёма Push-событий от внешних систем (Zabbix, AlertManager, OSS).
+    Предфильтрация, локальный буфер при недоступности fm-module, heartbeat.
+    Проксирование в fm-module `POST /api/v1/ingest`.
+
+    **Bounded context:** Ingest & Buffer (`backend/adapter/`).
+    **База данных:** `wisla_fm_adapter` (см. `db.md`).
+
+servers:
+  - url: http://localhost:8081
+    description: Local development (adapter)
+
+tags:
+  - name: public
+    description: Публичные endpoint'ы для внешних источников
+  - name: health
+    description: Проверка работоспособности
+  - name: internal
+    description: Внутренние endpoint'ы для fm-module (service-to-service)
+
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Health check
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Сервис доступен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Сервис деградирован (например, БД недоступна)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /webhook/{sourceKey}:
+    post:
+      tags: [public]
+      summary: Приём Push-события от внешнего источника
+      description: |
+        Webhook для Zabbix, AlertManager и аналогов.
+        Адаптер проверяет API-ключ источника, применяет предфильтрацию по кэшированным
+        `filter_rules`, пересылает payload в fm-module (`POST /api/v1/ingest?sourceKey={key}`).
+        При недоступности fm-module сообщение сохраняется в `buffered_messages` для retry.
+      operationId: receiveWebhook
+      parameters:
+        - $ref: '#/components/parameters/SourceKeyPath'
+        - $ref: '#/components/parameters/SourceKeyQuery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookPayload'
+          application/json; charset=utf-8:
+            schema:
+              $ref: '#/components/schemas/WebhookPayload'
+      responses:
+        '202':
+          description: Событие принято (передано в fm-module или поставлено в буфер)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookAcceptedResponse'
+        '400':
+          description: Невалидный JSON или отклонено предфильтром
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Неверный или отсутствующий API-ключ источника
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Источник заблокирован (шторм событий)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Неизвестный sourceKey или конфигурация источника не загружена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Payload превышает допустимый размер
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Источник остановлен или адаптер перегружен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - sourceKeyHeader: []
+        - sourceKeyQuery: []
+
+  /internal/sources/{sourceId}/config:
+    get:
+      tags: [internal]
+      summary: Получить кэшированную конфигурацию источника
+      description: |
+        Возвращает снимок из `source_config_snapshots` для указанного `source_id`.
+        Используется fm-module и фоновым sync-задачами адаптера для чтения локального кэша
+        (`filter_rules`, `api_key_hash`, `endpoint`, TTL).
+      operationId: getSourceConfigSnapshot
+      parameters:
+        - $ref: '#/components/parameters/SourceIdPath'
+      responses:
+        '200':
+          description: Кэшированная конфигурация найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceConfigSnapshot'
+        '404':
+          description: Снимок для источника отсутствует или TTL истёк
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - internalServiceAuth: []
+
+  /internal/probe:
+    post:
+      tags: [internal]
+      summary: Выполнить тестовый probe источника
+      description: |
+        Оркестрируется fm-module при нажатии «Тест подключения» в UI (`POST /api/v1/sources/{id}/test`).
+        Адаптер формирует служебное probe-событие, прогоняет его через тот же pipeline, что и webhook,
+        и возвращает результат доставки в fm-module.
+      operationId: executeProbe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProbeRequest'
+      responses:
+        '200':
+          description: Результат probe (успех или ошибка доставки)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProbeResponse'
+        '404':
+          description: Источник не найден в локальном кэше
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Источник остановлен или заблокирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - internalServiceAuth: []
+
+components:
+  parameters:
+    SourceKeyPath:
+      name: sourceKey
+      in: path
+      required: true
+      description: Публичный ключ источника (совпадает с query-параметром ingest в fm-module)
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        example: zabbix-prod-01
+
+    SourceKeyQuery:
+      name: sourceKey
+      in: query
+      required: false
+      description: |
+        Альтернатива заголовку `X-Source-Key` для систем, не поддерживающих кастомные headers
+        (например, некоторые webhook Zabbix). Если указан и заголовок, и query — оба должны совпадать.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+
+    SourceIdPath:
+      name: sourceId
+      in: path
+      required: true
+      description: Логическая ссылка на `event_sources.id` в fm-module (UUID)
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, down]
+          example: ok
+        version:
+          type: string
+          description: Версия развёрнутого адаптера (`adapter_version`)
+          example: 1.0.0
+        database:
+          type: string
+          enum: [up, down]
+          description: Доступность PostgreSQL `wisla_fm_adapter`
+        fm_module:
+          type: string
+          enum: [reachable, unreachable, unknown]
+          description: Результат последней проверки исходящего вызова ingest
+        buffered_count:
+          type: integer
+          minimum: 0
+          description: Количество сообщений в локальном буфере
+
+    WebhookPayload:
+      type: object
+      description: |
+        Сырой JSON от внешней системы. Структура зависит от источника (Zabbix, AlertManager).
+        Адаптер не валидирует доменную схему FM — только JSON и правила предфильтрации.
+      additionalProperties: true
+      example:
+        event_id: "12345"
+        severity: high
+        host: server01.example.com
+        problem: "CPU usage > 90%"
+        status: PROBLEM
+
+    WebhookAcceptedResponse:
+      type: object
+      required: [accepted, delivery]
+      properties:
+        accepted:
+          type: boolean
+          example: true
+        delivery:
+          type: string
+          enum: [forwarded, buffered, filtered]
+          description: |
+            `forwarded` — доставлено в fm-module;
+            `buffered` — fm-module недоступен, записано в буфер;
+            `filtered` — отброшено предфильтром (возвращается 400)
+        message_id:
+          type: string
+          format: uuid
+          description: ID записи в `buffered_messages` (только при `delivery=buffered`)
+        ingest_status:
+          type: integer
+          description: HTTP-статус ответа fm-module ingest (только при `delivery=forwarded`)
+
+    SourceConfigSnapshot:
+      type: object
+      required: [source_id, filter_rules, api_key_hash, endpoint, ttl_expires_at]
+      properties:
+        source_id:
+          type: string
+          format: uuid
+          description: Логическая ссылка на `event_sources.id` в fm-module
+        source_key:
+          type: string
+          description: Публичный ключ для webhook URL и ingest
+        filter_rules:
+          $ref: '#/components/schemas/FilterRules'
+        api_key_hash:
+          type: string
+          description: Хэш API-ключа источника (bcrypt/argon2) для проверки `X-Source-Key`
+          example: $2a$10$...
+        endpoint:
+          type: string
+          format: uri
+          description: Базовый URL fm-module для исходящего ingest
+          example: http://fm-module:8080
+        blocked:
+          type: boolean
+          default: false
+          description: Источник заблокирован (`SourceBlocked` от fm-module)
+        ttl_expires_at:
+          type: string
+          format: date-time
+          description: Момент истечения кэша; после — требуется повторный pull из fm-module
+        updated_at:
+          type: string
+          format: date-time
+
+    FilterRules:
+      type: object
+      description: |
+        Правила предобработки на адаптере (копия из `event_sources.filter_rules` fm-module).
+        MVP — JSON-условия по полям payload; post-MVP — ссылка на парсер.
+      properties:
+        enabled:
+          type: boolean
+          default: true
+        drop_if:
+          type: array
+          description: Список условий OR; при совпадении любого — событие отбрасывается
+          items:
+            $ref: '#/components/schemas/FilterCondition'
+        pass_only:
+          type: array
+          description: Белый список; если не пуст — пропускать только совпадающие
+          items:
+            $ref: '#/components/schemas/FilterCondition'
+      additionalProperties: true
+
+    FilterCondition:
+      type: object
+      required: [field, op]
+      properties:
+        field:
+          type: string
+          description: JSONPath или dot-notation к полю payload
+          example: severity
+        op:
+          type: string
+          enum: [eq, ne, contains, in, gt, lt, exists]
+        value: {}
+
+    ProbeRequest:
+      type: object
+      required: [source_id]
+      properties:
+        source_id:
+          type: string
+          format: uuid
+          description: ID источника в fm-module
+        source_key:
+          type: string
+          description: Опционально; если не указан — берётся из кэша
+        test_payload:
+          type: object
+          description: Переопределение тестового JSON (по умолчанию — встроенный probe template)
+          additionalProperties: true
+
+    ProbeResponse:
+      type: object
+      required: [success, source_id, probed_at]
+      properties:
+        success:
+          type: boolean
+        source_id:
+          type: string
+          format: uuid
+        probed_at:
+          type: string
+          format: date-time
+        delivery:
+          type: string
+          enum: [forwarded, buffered, failed]
+        ingest_status:
+          type: integer
+          description: HTTP-статус fm-module ingest
+        error:
+          type: string
+          description: Сообщение об ошибке при `success=false`
+        latency_ms:
+          type: integer
+          minimum: 0
+          description: Время round-trip до fm-module
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: invalid_source_key
+        message:
+          type: string
+          example: API key does not match source configuration
+        details:
+          type: object
+          additionalProperties: true
+
+  securitySchemes:
+    sourceKeyHeader:
+      type: apiKey
+      in: header
+      name: X-Source-Key
+      description: API-ключ источника (альтернатива query `sourceKey`)
+
+    sourceKeyQuery:
+      type: apiKey
+      in: query
+      name: sourceKey
+      description: API-ключ источника (альтернатива заголовку `X-Source-Key`)
+
+    internalServiceAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Сервисный токен fm-module → adapter для `/internal/*`.
+        Не пользовательский JWT.
+
+security: []

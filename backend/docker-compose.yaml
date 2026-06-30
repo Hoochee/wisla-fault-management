@@ -1,0 +1,108 @@
+x-adapter-service: &adapter-service
+  build:
+    context: ./adapter
+    dockerfile: Dockerfile
+  environment: &adapter-env
+    PORT: 8081
+    DATABASE_USER: postgres
+    DATABASE_PASSWORD: postgres
+    FM_MODULE_BASE_URL: http://fm-module:8080
+    FM_MODULE_SERVICE_KEY: dev-service-key
+    INTERNAL_SERVICE_TOKEN: dev-internal-token
+  depends_on:
+    fm-module:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD-SHELL", "curl -fsS http://localhost:8081/health || exit 1"]
+    interval: 10s
+    timeout: 5s
+    retries: 12
+    start_period: 90s
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  fm-module:
+    build:
+      context: ./fm-module
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/wisla_fm
+      DATABASE_USER: wisla
+      DATABASE_PASSWORD: wisla
+      JWT_SECRET: change-me-in-production-use-at-least-32-characters-secret
+      SERVICE_API_KEY: dev-service-key
+      ADAPTER_BASE_URL: http://adapter:8081
+      ADAPTER_PUBLIC_URL: http://localhost:8081
+      ADAPTER_INTERNAL_TOKEN: dev-internal-token
+      ZABBIX_SIMULATOR_BASE_URL: http://zabbix-simulator:8082
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+
+  adapter:
+    <<: *adapter-service
+    ports:
+      - "8081:8081"
+    environment:
+      <<: *adapter-env
+      DATABASE_URL: jdbc:postgresql://postgres:5432/wisla_fm_adapter
+
+  adapter-2:
+    <<: *adapter-service
+    ports:
+      - "8083:8081"
+    environment:
+      <<: *adapter-env
+      DATABASE_URL: jdbc:postgresql://postgres:5432/wisla_fm_adapter_2
+
+  zabbix-simulator:
+    build:
+      context: ./zabbix-simulator
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      PORT: 8082
+      SIMULATOR_ENABLED: "true"
+      ZABBIX_URL: https://zabbix.wisla.local
+      ADAPTER_BASE_URL: http://adapter:8081
+      SOURCE_WEBHOOK_KEY: zabbix-prod-01
+      ZABBIX_SOURCE_API_KEY: zabbix-demo-key
+      SIMULATOR_INTERVAL_SEC: 90
+      SIMULATOR_INITIAL_DELAY_SEC: 45
+      SIMULATOR_EVENT_ID_START: "10050"
+    depends_on:
+      adapter:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8082/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 60s
+
+volumes:
+  postgres_data:

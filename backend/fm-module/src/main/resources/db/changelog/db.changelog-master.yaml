@@ -1,0 +1,23 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/changes/001-extensions.sql
+  - include:
+      file: db/changelog/changes/002-identity.sql
+  - include:
+      file: db/changelog/changes/003-configuration.sql
+  - include:
+      file: db/changelog/changes/005-ingestion.sql
+  - include:
+      file: db/changelog/changes/006-processing.sql
+  - include:
+      file: db/changelog/changes/007-action-logs.sql
+  - include:
+      file: db/changelog/changes/008-rules.sql
+  - include:
+      file: db/changelog/changes/009-cmdb.sql
+  - include:
+      file: db/changelog/changes/010-console.sql
+  - include:
+      file: db/changelog/changes/011-settings.sql
+  - include:
+      file: db/changelog/changes/012-rule-push-notifications.sql

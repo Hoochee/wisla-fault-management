@@ -1,0 +1,101 @@
+<div class="layout">
+  <aside class="sidebar" [class.collapsed]="collapsed()">
+    <div class="sidebar-header">
+      @if (!collapsed()) {
+        <a routerLink="/" class="logo">
+          <span class="logo-icon">W</span>
+          <div>
+            <div class="logo-title">WISLA FM</div>
+            <div class="logo-sub">Fault Management</div>
+          </div>
+        </a>
+      } @else {
+        <a routerLink="/" class="logo-collapsed"><span class="logo-icon">W</span></a>
+      }
+    </div>
+
+    @if (!collapsed()) {
+      <div class="tenant-select">
+        <button type="button" class="tenant-btn">NOC Центр ▼</button>
+      </div>
+      <div class="favorites">
+        <div class="section-label">★ Избранное</div>
+        @for (f of favorites; track f.path) {
+          <a [routerLink]="f.path" class="fav-link">{{ f.label }}</a>
+        }
+      </div>
+    }
+
+    <nav class="nav">
+      @for (item of navigation; track item.label) {
+        <div class="nav-group">
+          @if (item.children) {
+            <button type="button" class="nav-parent" (click)="toggleSection(item.label)">
+              <span>{{ item.icon }}</span>
+              @if (!collapsed()) {
+                <span class="nav-label">{{ item.label }}</span>
+                <span class="chevron">{{ isExpanded(item.label) ? '▾' : '▸' }}</span>
+              }
+            </button>
+            @if (isExpanded(item.label) && !collapsed()) {
+              @for (child of item.children; track child.path) {
+                <a
+                  [routerLink]="child.path"
+                  routerLinkActive="active"
+                  [routerLinkActiveOptions]="{ exact: child.path === '/' }"
+                  class="nav-child"
+                  [class.post-mvp]="child.postMvp"
+                >
+                  {{ child.label }}
+                  @if (child.postMvp) { <span class="mvp-tag">post-MVP</span> }
+                </a>
+              }
+            }
+          } @else {
+            <a
+              [routerLink]="item.path!"
+              routerLinkActive="active"
+              class="nav-item"
+              [class.post-mvp]="item.postMvp"
+            >
+              <span>{{ item.icon }}</span>
+              @if (!collapsed()) {
+                <span class="nav-label">{{ item.label }}</span>
+                @if (item.postMvp) { <span class="mvp-tag">post-MVP</span> }
+              }
+            </a>
+          }
+        </div>
+      }
+    </nav>
+
+    <div class="sidebar-footer">
+      @if (!collapsed() && user()) {
+        <div class="user-info">{{ user()!.fullName }}</div>
+      }
+      <button type="button" class="collapse-btn" (click)="toggleCollapsed()" [title]="collapsed() ? 'Развернуть' : 'Свернуть'">
+        {{ collapsed() ? '▶' : '◀' }}
+      </button>
+      <button type="button" class="logout-btn" (click)="logout()" title="Выход">⎋</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <nav class="breadcrumbs">
+        @for (crumb of breadcrumbs(); track crumb.label; let last = $last) {
+          @if (crumb.path && !last) {
+            <a [routerLink]="crumb.path">{{ crumb.label }}</a>
+            <span class="sep">/</span>
+          } @else {
+            <span class="current">{{ crumb.label }}</span>
+          }
+        }
+      </nav>
+    </header>
+    <main class="content">
+      <router-outlet />
+    </main>
+  </div>
+  <app-push-toast />
+</div>

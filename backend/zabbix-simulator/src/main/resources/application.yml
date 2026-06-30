@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: wisla-fm-zabbix-simulator
+
+server:
+  port: ${PORT:8082}
+
+wisla:
+  zabbix-simulator:
+    enabled: ${SIMULATOR_ENABLED:true}
+    zabbix-url: ${ZABBIX_URL:https://zabbix.wisla.local}
+    # Simulator talks ONLY to adapter — never to fm-module ingest.
+    adapter-base-url: ${ADAPTER_BASE_URL:http://localhost:8081}
+    source-webhook-key: ${SOURCE_WEBHOOK_KEY:zabbix-prod-01}
+    adapter-webhook-url: ${ADAPTER_WEBHOOK_URL:}
+    api-key: ${ZABBIX_SOURCE_API_KEY:zabbix-demo-key}
+    interval-sec: ${SIMULATOR_INTERVAL_SEC:90}
+    initial-delay-sec: ${SIMULATOR_INITIAL_DELAY_SEC:30}
+    jitter-sec: ${SIMULATOR_JITTER_SEC:15}
+    recovery-probability: ${SIMULATOR_RECOVERY_PROBABILITY:0.35}
+    # Next problem event_id = event-id-start + 1; keep above max ingested external_id for the source.
+    event-id-start: ${SIMULATOR_EVENT_ID_START:10000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

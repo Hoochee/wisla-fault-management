@@ -1,0 +1,179 @@
+<div class="page">
+  <div class="top">
+    <div>
+      <h1>Здоровье продуктов</h1>
+      <p class="subtitle">Оперативный центр · вкладка здоровья КЕ</p>
+    </div>
+    <div class="toolbar">
+      @if (isAdmin()) {
+        <button type="button" class="btn-primary" (click)="openCreate()">+ Продукт</button>
+      }
+      <div class="filters">
+        <select [value]="tenantFilter" (change)="onTenantChange($any($event.target).value)">
+          <option value="">Все тенанты</option>
+          @for (t of tenants; track t) {
+            <option [value]="t">{{ t }}</option>
+          }
+        </select>
+        <select [value]="siteFilter" (change)="onSiteChange($any($event.target).value)">
+          <option value="">Все площадки</option>
+          @for (s of sites; track s) {
+            <option [value]="s">{{ s }}</option>
+          }
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="heatmap-section">
+    <div class="legend">
+      <span>Обзор:</span>
+      @for (s of severities; track s) {
+        <app-severity-badge [severity]="s" />
+      }
+    </div>
+    <div class="heatmap-strip">
+      @for (p of filteredProducts; track p.id) {
+        <div
+          class="heat-cell-wrap"
+          [class.selected]="selectedProductId === p.id"
+        >
+          <button
+            type="button"
+            class="heat-cell"
+            [class.selected]="selectedProductId === p.id"
+            [style.background-color]="getHeatColor(p.maxSeverity, p.activeEventCount)"
+            (click)="selectProduct(p.id)"
+          >
+            <div class="name">{{ p.name }}</div>
+            <div class="foot">
+              <app-severity-badge [severity]="p.maxSeverity" [compact]="true" />
+              <span class="count">{{ p.activeEventCount }}</span>
+            </div>
+          </button>
+          @if (isAdmin()) {
+            <div class="cell-actions">
+              <button type="button" class="icon-btn" title="Редактировать" (click)="openEdit(p, $event)">✎</button>
+              <button type="button" class="icon-btn danger" title="Удалить" (click)="confirmDelete(p, $event)">✕</button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+
+  @if (selectedProduct) {
+    <div class="operative">
+      <app-ci-sidebar
+        [product]="selectedProduct"
+        [ciList]="ciList"
+        [selectedCiId]="selectedCiId"
+        [profiles]="profiles"
+        (selectCi)="selectCi($event)"
+      />
+      <div class="operative-main">
+        <app-operative-center-panel
+          [product]="selectedProduct"
+          [ciList]="ciList"
+          [selectedCiId]="selectedCiId"
+          [profiles]="profiles"
+          [events]="events"
+          defaultTab="health"
+        />
+      </div>
+    </div>
+
+    <div class="footer-link">
+      <a [routerLink]="['/health', selectedProduct.id]">Открыть продукт «{{ selectedProduct.name }}» в отдельном представлении →</a>
+    </div>
+  }
+</div>
+
+@if (modalOpen()) {
+  <div class="overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h2>{{ editingId() ? 'Редактирование продукта' : 'Новый продукт' }}</h2>
+      <form (ngSubmit)="saveProduct()">
+        <div class="form-field">
+          <label for="product-name">Название</label>
+          <input id="product-name" type="text" [(ngModel)]="form.name" name="name" required />
+        </div>
+        <div class="form-field">
+          <label for="product-code">Код</label>
+          <input id="product-code" type="text" [(ngModel)]="form.code" name="code" required />
+        </div>
+        <div class="form-field">
+          <label for="product-tenant">Тенант</label>
+          <input id="product-tenant" type="text" [(ngModel)]="form.tenant" name="tenant" required />
+        </div>
+        <div class="form-field">
+          <label for="product-site">Площадка</label>
+          <input id="product-site" type="text" [(ngModel)]="form.site" name="site" required />
+        </div>
+        <div class="form-field">
+          <label for="product-tags">Теги (через запятую)</label>
+          <input id="product-tags" type="text" [(ngModel)]="form.tagsText" name="tagsText" />
+        </div>
+        <div class="form-field ci-picker">
+          <label for="product-ci-search">КЕ (необязательно)</label>
+          <input
+            id="product-ci-search"
+            type="search"
+            [(ngModel)]="ciSearch"
+            name="ciSearch"
+            placeholder="Поиск по FQDN"
+          />
+          <div class="ci-list">
+            @for (ci of filteredCis(); track ci.id) {
+              <label class="ci-option">
+                <input
+                  type="checkbox"
+                  [checked]="isCiSelected(ci.id)"
+                  (change)="toggleCiId(ci.id, $any($event.target).checked)"
+                />
+                <span class="mono">{{ ci.fqdn }}</span>
+              </label>
+            }
+          </div>
+        </div>
+        @if (formError()) {
+          <p class="error">{{ formError() }}</p>
+        }
+        <div class="modal-actions">
+          <button type="button" class="btn" (click)="closeModal()">Отмена</button>
+          <button type="submit" class="btn-primary" [disabled]="saving()">
+            {{ editingId() ? 'Сохранить' : 'Создать' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+@if (deleteTarget()) {
+  <div class="overlay" (click)="deleteTarget.set(null)">
+    <div class="modal modal-sm" (click)="$event.stopPropagation()">
+      <h2>Удалить продукт?</h2>
+      <p>«{{ deleteTarget()!.name }}» будет удалён безвозвратно.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn" (click)="deleteTarget.set(null)">Отмена</button>
+        <button type="button" class="btn-danger" (click)="deleteProduct()">Удалить</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (deleteBlocked()) {
+  <div class="overlay" (click)="deleteBlocked.set(null)">
+    <div class="modal modal-sm" (click)="$event.stopPropagation()">
+      <h2>Невозможно удалить</h2>
+      <p>Сначала отвяжите КЕ от продукта «{{ deleteBlocked()!.name }}».</p>
+      <div class="modal-actions">
+        <button type="button" class="btn" (click)="deleteBlocked.set(null)">Закрыть</button>
+        <a class="btn-primary link-btn" [routerLink]="['/health', deleteBlocked()!.id]" (click)="deleteBlocked.set(null)">
+          Открыть состав
+        </a>
+      </div>
+    </div>
+  </div>
+}

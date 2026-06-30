@@ -1,0 +1,10 @@
+# Demo override: fill REPLACE_* after creating a source in UI (see docs/demo/add-signal-source-scenario.md)
+services:
+  zabbix-simulator:
+    environment:
+      SIMULATOR_ENABLED: "true"
+      ADAPTER_BASE_URL: http://adapter:8081
+      SOURCE_WEBHOOK_KEY: REPLACE_WEBHOOK_KEY
+      ZABBIX_SOURCE_API_KEY: REPLACE_API_KEY
+      SIMULATOR_INTERVAL_SEC: 90
+      SIMULATOR_INITIAL_DELAY_SEC: 20
