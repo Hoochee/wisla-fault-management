@@ -2,7 +2,7 @@
 
 Модуль приёма, нормализации, обработки и отображения аварийных событий мониторинга.
 
-Собран с помощью [decomposition-pattern](https://github.com/sortedmap/decomposition-pattern) — мультиагентного workflow для разработки продукта.
+Собран с помощью [decomposition-pattern](https://github.com/Hoochee/decomposition-pattern) — мультиагентного workflow для разработки продукта.
 
 ## Состав
 
