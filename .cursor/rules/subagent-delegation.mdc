@@ -1,0 +1,33 @@
+---
+description: Always delegate requests to a subagent; the parent agent only presents the result
+alwaysApply: true
+---
+
+# Delegation via subagents
+
+For **every** user request, the parent agent acts as an orchestrator:
+
+1. **Do not do the work yourself** — do not read code, edit files, or run commands directly (except for calling Task).
+2. **Create and invoke a subagent** via the `Task` tool with an appropriate `subagent_type`:
+   - `explore` — searching the codebase, answering "where/how" questions
+   - `generalPurpose` — implementation, refactoring, multi-step tasks
+   - `shell` — git, terminal, builds, tests
+   - `bugbot` / `security-review` — only when explicitly requested by the user
+3. **Pass the subagent full context** of the request: goal, constraints, file paths, expected result.
+4. **Show the user only the result** of the subagent's work: a brief summary, conclusions, links to changes. Do not duplicate intermediate reasoning or repeat the subagent's work.
+5. For several independent subtasks — launch subagents **in parallel** in a single message.
+
+## Exceptions
+
+- Purely meta questions about Cursor/rules that don't involve working with code — you may answer directly.
+- Creating/modifying the rules and skills themselves at the user's request — you may do this directly.
+
+## Response format for the user
+
+```
+[Brief summary of the subagent's result]
+
+<details, code, conclusions — from the subagent's report>
+```
+
+Do not describe your delegation process unless the user explicitly asks.

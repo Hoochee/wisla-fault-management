@@ -1,0 +1,57 @@
+---
+description: How to create and push feature branches so they never track protected main
+alwaysApply: true
+---
+
+# Feature branch creation (GitHub protected main)
+
+## Problem
+
+`git checkout -b feature/X origin/main` (without `--no-track`) makes the new branch **track `origin/main`**. IDE then runs:
+
+```text
+git push origin refs/heads/feature/X:main
+```
+
+Remote rejects this when `main` is protected: *You are not allowed to push code to protected branches*.
+
+## Correct create
+
+```bash
+git fetch origin main
+git switch -c feature/WISLA-<n> --no-track origin/main
+```
+
+Equivalent:
+
+```bash
+git checkout --no-track -b feature/WISLA-<n> origin/main
+```
+
+> Default branch for this repo is **`main`**. Jira key pattern defaults to `WISLA-<n>`; if the ticket uses another prefix, keep `feature/<FULL-KEY>`.
+
+## Correct first push (only when user asks)
+
+```bash
+git push -u origin HEAD
+```
+
+Never: `git push origin HEAD:main`, `git push -u origin HEAD:main`, or `git branch -u origin/main`.
+
+## If a feature branch already tracks main
+
+```bash
+git branch --unset-upstream
+git push -u origin HEAD
+```
+
+Or, if the remote feature branch already exists:
+
+```bash
+git branch -u origin/feature/WISLA-<n>
+```
+
+## Checklist after creating a branch
+
+- `git status -sb` must **not** show `...origin/main`
+- Upstream must be absent until first push, then `origin/feature/WISLA-<n>`
