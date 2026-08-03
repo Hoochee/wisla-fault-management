@@ -37,6 +37,8 @@ rules:
   design:
     - Split changes by service/layer (adapter / fm-module / Angular UI / optional prototype)
     - Document integration points (adapter → fm-module ingest, SPA → fm-module REST)
+    - For new or materially changed backend behavior, reference docs/adr/ADR-001-hexagonal-architecture.md and document dependency direction: domain is free of Spring/JPA/Jackson/Kafka/HTTP; application depends on domain and ports; adapters implement ports; Spring wiring stays in infrastructure/config
+    - For new or materially changed backend behavior, include the six-part checklist: use cases and inbound ports; inbound adapters; outbound ports; outbound adapter implementations; infrastructure wiring; Spring-free use-case test planning with outbound-port test doubles. For pure config, documentation, or other non-behavioral backend edits, do not invent artificial checklist items or use-case tests
   tasks:
     - Follow TDD — add failing test, implement, refactor, green build
     - Group tasks by module; within each module, test tasks before implementation tasks
