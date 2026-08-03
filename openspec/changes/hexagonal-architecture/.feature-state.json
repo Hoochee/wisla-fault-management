@@ -1,0 +1,36 @@
+{
+    "phase":  "review",
+    "jiraKey":  null,
+    "changeName":  "hexagonal-architecture",
+    "branch":  "feature/WISLA-refactor",
+    "modules":  [
+                    "docs",
+                    ".agents",
+                    "build-feature",
+                    "openspec"
+                ],
+    "approvals":  {
+                      "scope":  true,
+                      "artifacts":  true,
+                      "readyForPr":  false
+                  },
+    "tests":  {
+                  "backend":  "skipped",
+                  "frontend":  "skipped",
+                  "frontend_e2e":  "skipped"
+              },
+    "testFixIterations":  {
+                              "backend":  0,
+                              "frontend":  0
+                          },
+    "codeReview":  {
+                       "backend":  {
+                                       "status":  "approved",
+                                       "iterations":  2
+                                   },
+                       "frontend":  {
+                                        "status":  "skipped",
+                                        "iterations":  0
+                                    }
+                   }
+}

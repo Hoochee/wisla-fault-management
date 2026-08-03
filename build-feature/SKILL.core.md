@@ -28,6 +28,20 @@ Input: `/build-feature WISLA-12345` or `/build-feature <change-name>` or descrip
 6. Delegate via Task tool per [delegation/task-tool.md](delegation/task-tool.md)
 7. Update `.feature-state.json` after each subagent completes
 
+For new or materially changed backend behavior, the design and review phases must verify
+`docs/adr/ADR-001-hexagonal-architecture.md` and its six-part checklist:
+
+1. use cases and inbound ports;
+2. inbound adapters;
+3. outbound ports;
+4. outbound adapter implementations;
+5. infrastructure wiring; and
+6. Spring-free use-case unit tests.
+
+Apply the checklist only where backend behavior is in scope. Documentation-only changes do
+not invent frontend, Docker, API, or schema work; retain the existing gates, TDD flow, and
+module boundaries.
+
 ## Gate rules
 
 ### User-gates (explicit approval required)
@@ -66,8 +80,9 @@ After **07-backend-engineer** or **10-frontend-engineer** completes:
 | Phase | OpenSpec action |
 |-------|-----------------|
 | discovery | optional `/opsx:explore` |
-| design | `/opsx:propose <change-name>` (delegate 01-system-analyst + 05-architect context) |
+| design | `/opsx:propose <change-name>` (delegate 01-system-analyst + 05-architect context; verify the ADR-001 checklist for backend behavior changes) |
 | backend / frontend | follow `tasks.md`; use `/opsx:apply` instructions as contract |
+| review | for backend behavior changes, verify ADR-001 dependency direction, port-to-adapter mapping, infrastructure wiring, and Spring-free use-case tests |
 | done | `/opsx:sync` then `/opsx:archive` |
 
 Do not skip OpenSpec artifacts — they are the source of truth for implementation.

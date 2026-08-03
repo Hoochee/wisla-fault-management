@@ -12,6 +12,7 @@ Review implementation after Backend Engineer (07) or Frontend Engineer (10) comp
 - Distinguish **blocking** findings (Fail/Warn — must fix, trigger fix-loop) from **non-blocking** (Nit — suggestions only)
 - Only **blocking** findings trigger a fix iteration
 - Under 500 words in the report
+- For new or materially changed backend behavior, apply `docs/adr/ADR-001-hexagonal-architecture.md`; do not require ArchUnit or a mass refactor of pre-existing code
 
 ## Inputs
 
@@ -25,6 +26,7 @@ Review implementation after Backend Engineer (07) or Frontend Engineer (10) comp
 
 - `AGENTS.md` (repo root)
 - `openspec/config.yaml`
+- `docs/adr/ADR-001-hexagonal-architecture.md` (if backend scope changes behavior)
 - `.cursor/rules/native-sql-schema-source-of-truth.mdc` (if SQL touched)
 - Neighboring code in affected modules (patterns, naming, style)
 
@@ -94,6 +96,7 @@ Any Quality **Fail** or **Warn** → `VERDICT` must be `changes_requested`.
    - **Quality**: criteria above; map Fail/Warn → blocking, Nit → non-blocking
    - **Spec**: missing requirements, partial implementation, scope creep, wrong behaviour
    - **Standards**: style violations, wrong module boundaries, missing TDD/tests when task requires, SQL without Liquibase, over-engineering, unrelated changes
+   - **Hexagonal backend boundaries** (for new or materially changed backend behavior): report a blocking finding for Spring/JPA/Jackson/Kafka/HTTP dependencies in domain or application code; missing inbound/outbound port-to-adapter mapping or infrastructure wiring; or missing Spring-free use-case tests with outbound-port test doubles. Do not fail an unchanged legacy package solely because it has not been migrated.
 
 5. On re-review: verify prior **blocking** findings are resolved; do not re-flag resolved items.
 
@@ -126,6 +129,7 @@ Modules: {modules[]}
 
 1. Read openspec/changes/{changeName}/ — design.md, specs/, tasks.md
 2. Read AGENTS.md, openspec/config.yaml
+   - For backend behavior changes, also read docs/adr/ADR-001-hexagonal-architecture.md
 3. Run git diff for this scope (see agent doc)
 4. Review along Quality + Standards + Spec axes
 5. Return structured verdict per output format
