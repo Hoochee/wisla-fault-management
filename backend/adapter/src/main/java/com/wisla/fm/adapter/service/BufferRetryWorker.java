@@ -1,6 +1,7 @@
 package com.wisla.fm.adapter.service;
 
 import com.wisla.fm.adapter.config.AdapterProperties;
+import com.wisla.fm.adapter.kafka.RawEventPublisher;
 import com.wisla.fm.adapter.persistence.entity.BufferedMessage;
 import com.wisla.fm.adapter.persistence.repository.BufferedMessageRepository;
 import com.wisla.fm.adapter.persistence.repository.SourceConfigSnapshotRepository;
@@ -16,20 +17,20 @@ public class BufferRetryWorker {
 
     private final BufferedMessageRepository bufferedMessageRepository;
     private final SourceConfigSnapshotRepository sourceConfigSnapshotRepository;
-    private final FmModuleClient fmModuleClient;
+    private final RawEventPublisher rawEventPublisher;
     private final IngestPayloadMapper ingestPayloadMapper;
     private final AdapterProperties properties;
 
     public BufferRetryWorker(
             BufferedMessageRepository bufferedMessageRepository,
             SourceConfigSnapshotRepository sourceConfigSnapshotRepository,
-            FmModuleClient fmModuleClient,
+            RawEventPublisher rawEventPublisher,
             IngestPayloadMapper ingestPayloadMapper,
             AdapterProperties properties
     ) {
         this.bufferedMessageRepository = bufferedMessageRepository;
         this.sourceConfigSnapshotRepository = sourceConfigSnapshotRepository;
-        this.fmModuleClient = fmModuleClient;
+        this.rawEventPublisher = rawEventPublisher;
         this.ingestPayloadMapper = ingestPayloadMapper;
         this.properties = properties;
     }
@@ -51,18 +52,11 @@ public class BufferRetryWorker {
             return;
         }
 
-        String ingestApiKey = message.getIngestApiKey();
-        if (ingestApiKey == null || ingestApiKey.isBlank()) {
-            message.scheduleRetry(properties.bufferRetryBaseSeconds());
-            bufferedMessageRepository.save(message);
-            return;
-        }
-
         var config = configOpt.get();
         var ingestBody = ingestPayloadMapper.toIngestRequest(message.getPayload());
-        FmModuleClient.IngestResult result = fmModuleClient.forwardIngest(
-                config.getEndpoint(),
-                ingestApiKey,
+        RawEventPublisher.PublishResult result = rawEventPublisher.publish(
+                config.getSourceId(),
+                config.getSourceKey(),
                 ingestBody
         );
 

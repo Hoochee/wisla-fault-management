@@ -1,0 +1,33 @@
+﻿{
+    "phase":  "done",
+    "jiraKey":  "WISLA-add-kafka",
+    "changeName":  "adapter-fm-kafka-ingest",
+    "branch":  "feature/WISLA-add-kafka",
+    "modules":  [
+                    "backend/adapter",
+                    "backend/fm-module"
+                ],
+    "approvals":  {
+                      "scope":  true,
+                      "artifacts":  true,
+                      "readyForPr":  true
+                  },
+    "tests":  {
+                  "backend":  "passed",
+                  "frontend":  "skipped"
+              },
+    "testFixIterations":  {
+                              "backend":  0,
+                              "frontend":  0
+                          },
+    "codeReview":  {
+                       "backend":  {
+                                       "status":  "approved",
+                                       "iterations":  0
+                                   },
+                       "frontend":  {
+                                        "status":  "skipped",
+                                        "iterations":  0
+                                    }
+                   }
+}

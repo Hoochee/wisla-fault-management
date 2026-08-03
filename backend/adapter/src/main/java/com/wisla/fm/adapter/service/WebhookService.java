@@ -3,6 +3,7 @@ package com.wisla.fm.adapter.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wisla.fm.adapter.config.AdapterProperties;
+import com.wisla.fm.adapter.kafka.RawEventPublisher;
 import com.wisla.fm.adapter.persistence.entity.BufferedMessage;
 import com.wisla.fm.adapter.persistence.entity.SourceConfigSnapshot;
 import com.wisla.fm.adapter.web.dto.WebhookAcceptedResponse;
@@ -16,7 +17,7 @@ public class WebhookService {
 
     private final SourceConfigService sourceConfigService;
     private final FilterService filterService;
-    private final FmModuleClient fmModuleClient;
+    private final RawEventPublisher rawEventPublisher;
     private final IngestPayloadMapper ingestPayloadMapper;
     private final BufferService bufferService;
     private final PasswordEncoder passwordEncoder;
@@ -26,7 +27,7 @@ public class WebhookService {
     public WebhookService(
             SourceConfigService sourceConfigService,
             FilterService filterService,
-            FmModuleClient fmModuleClient,
+            RawEventPublisher rawEventPublisher,
             IngestPayloadMapper ingestPayloadMapper,
             BufferService bufferService,
             PasswordEncoder passwordEncoder,
@@ -35,7 +36,7 @@ public class WebhookService {
     ) {
         this.sourceConfigService = sourceConfigService;
         this.filterService = filterService;
-        this.fmModuleClient = fmModuleClient;
+        this.rawEventPublisher = rawEventPublisher;
         this.ingestPayloadMapper = ingestPayloadMapper;
         this.bufferService = bufferService;
         this.passwordEncoder = passwordEncoder;
@@ -66,21 +67,21 @@ public class WebhookService {
 
     WebhookAcceptedResponse deliver(SourceConfigSnapshot config, String ingestApiKey, Map<String, Object> payload) {
         Map<String, Object> ingestBody = ingestPayloadMapper.toIngestRequest(payload);
-        FmModuleClient.IngestResult result = fmModuleClient.forwardIngest(
-                properties.fmModuleBaseUrl(),
-                ingestApiKey,
+        RawEventPublisher.PublishResult result = rawEventPublisher.publish(
+                config.getSourceId(),
+                config.getSourceKey(),
                 ingestBody
         );
 
         if (result.success()) {
-            return new WebhookAcceptedResponse(true, "forwarded", null, result.httpStatus());
+            return new WebhookAcceptedResponse(true, "forwarded", null, null);
         }
 
         if (!result.retryable()) {
             throw new AdapterException(
                     "ingest_rejected",
-                    result.error() != null ? result.error() : "fm-module rejected ingest",
-                    result.httpStatus() != null ? result.httpStatus() : 502
+                    result.error() != null ? result.error() : "Kafka publish rejected",
+                    502
             );
         }
 

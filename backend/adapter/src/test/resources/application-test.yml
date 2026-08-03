@@ -11,9 +11,17 @@ spring:
       ddl-auto: create-drop
   liquibase:
     enabled: false
+  kafka:
+    bootstrap-servers: ${spring.embedded.kafka.brokers:localhost:9092}
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
 wisla:
   adapter:
     fm-module-health-check-enabled: false
     internal-service-token: test-internal-token
     max-payload-bytes: 1024
+  kafka:
+    raw-events-topic: fm.raw-events

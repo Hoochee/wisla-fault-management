@@ -1,10 +1,10 @@
 package com.wisla.fm.adapter.web;
 
+import com.wisla.fm.adapter.kafka.RawEventPublisher;
 import com.wisla.fm.adapter.persistence.repository.SourceConfigSnapshotRepository;
-import com.wisla.fm.adapter.service.FmModuleClient;
-import com.wisla.fm.adapter.testsupport.FmModuleClientTestConfiguration;
+import com.wisla.fm.adapter.testsupport.RawEventPublisherTestConfiguration;
 import com.wisla.fm.adapter.testsupport.SourceConfigTestData;
-import com.wisla.fm.adapter.testsupport.TestFmModuleClient;
+import com.wisla.fm.adapter.testsupport.TestRawEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import(FmModuleClientTestConfiguration.class)
+@Import(RawEventPublisherTestConfiguration.class)
 class InternalControllerTest {
 
     private static final String INTERNAL_TOKEN = "test-internal-token";
@@ -46,11 +46,11 @@ class InternalControllerTest {
     private PasswordEncoder passwordEncoder;
 
     @Autowired
-    private TestFmModuleClient fmModuleClient;
+    private TestRawEventPublisher rawEventPublisher;
 
     @BeforeEach
     void setUp() {
-        fmModuleClient.resetForwardIngest();
+        rawEventPublisher.reset();
         sourceConfigRepository.deleteAll();
         sourceConfigRepository.save(SourceConfigTestData.snapshot(
                 SOURCE_ID,
@@ -114,8 +114,8 @@ class InternalControllerTest {
     }
 
     @Test
-    void executeProbeForwardsSuccessfully() throws Exception {
-        fmModuleClient.stubForwardIngest(new FmModuleClient.IngestResult(true, 202, 15L, null, false));
+    void executeProbePublishesSuccessfully() throws Exception {
+        rawEventPublisher.stubPublish(RawEventPublisher.PublishResult.ok());
 
         mockMvc.perform(post("/internal/probe")
                         .header("Authorization", "Bearer " + INTERNAL_TOKEN)
@@ -130,14 +130,13 @@ class InternalControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.source_id").value(SOURCE_ID.toString()))
                 .andExpect(jsonPath("$.delivery").value("forwarded"))
-                .andExpect(jsonPath("$.ingest_status").value(202))
                 .andExpect(jsonPath("$.probed_at").exists())
                 .andExpect(jsonPath("$.latency_ms").exists());
     }
 
     @Test
     void executeProbeReportsBufferedDeliveryAsFailure() throws Exception {
-        fmModuleClient.stubForwardIngest(new FmModuleClient.IngestResult(false, null, 8L, "timeout", true));
+        rawEventPublisher.stubPublish(RawEventPublisher.PublishResult.retryable("timeout"));
 
         mockMvc.perform(post("/internal/probe")
                         .header("Authorization", "Bearer " + INTERNAL_TOKEN)
@@ -151,7 +150,7 @@ class InternalControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.delivery").value("buffered"))
-                .andExpect(jsonPath("$.error").value("fm-module unavailable, message buffered"));
+                .andExpect(jsonPath("$.error").value("Kafka unavailable, message buffered"));
     }
 
     @Test
@@ -212,7 +211,7 @@ class InternalControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.delivery").value("failed"))
-                .andExpect(jsonPath("$.error").value("ingest_api_key is required for fm-module delivery test"));
+                .andExpect(jsonPath("$.error").value("ingest_api_key is required for Kafka delivery test"));
     }
 
     @Test

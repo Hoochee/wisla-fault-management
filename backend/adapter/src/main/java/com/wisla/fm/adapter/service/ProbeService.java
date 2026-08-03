@@ -37,7 +37,7 @@ public class ProbeService {
                     Instant.now(),
                     "failed",
                     null,
-                    "ingest_api_key is required for fm-module delivery test",
+                    "ingest_api_key is required for Kafka delivery test",
                     0L
             );
         }
@@ -57,7 +57,7 @@ public class ProbeService {
                     Instant.now(),
                     delivery.delivery(),
                     delivery.ingest_status(),
-                    success ? null : "fm-module unavailable, message buffered",
+                    success ? null : "Kafka unavailable, message buffered",
                     latency
             );
         } catch (AdapterException ex) {
