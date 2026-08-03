@@ -38,3 +38,6 @@ npm-debug.log*
 # Local reference files
 *.pdf
 output.md
+
+# CodeGraph local index
+.codegraph/
