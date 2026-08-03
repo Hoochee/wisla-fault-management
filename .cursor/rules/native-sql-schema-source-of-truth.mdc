@@ -1,0 +1,29 @@
+---
+description: Native SQL and integration schemas must use real column names from the owning service
+globs: "**/*Repository*.java,**/schema.sql,**/fixture*.sql,**/db/changelog/**/*.sql"
+alwaysApply: false
+---
+
+# Native SQL: schema source of truth
+
+Before writing or changing native SQL (`@Query`, JDBC) that joins tables owned by another service or changelog, **look up real column names** in that service's entity mappings, Liquibase changelogs, or init schema. Do **not** invent names from naming conventions (`fk_*`, `*_id`, etc.).
+
+## Required checks
+
+1. Find the owning service for the table (e.g. console events → `backend/fm-module`, buffered messages → `backend/adapter`).
+2. Copy join/column names from entity `@JoinColumn` / `@Column` / `@AttributeOverride` or from an existing Liquibase SQL under `src/main/resources/db/changelog/changes/`.
+3. Integration `schema.sql` / fixtures / Testcontainers init must mirror that same source — **never** derive DDL from the query under test.
+
+## Example (pattern)
+
+```sql
+-- BAD — invented columns; Postgres: column does not exist
+join events e on e.fk_source = s.id
+
+-- GOOD — matches entity / Liquibase changelog in fm-module
+join events e on e.source_id = s.id
+```
+
+## Review gate
+
+If you cannot point to the entity or Liquibase migration that defines a column, do not ship the query.

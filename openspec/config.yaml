@@ -1,0 +1,46 @@
+schema: spec-driven
+
+context: |
+  WISLA Fault Management (Wellink) — fault/alarm event ingestion, normalization,
+  processing rules, and operator console.
+
+  Layout:
+  - backend/fm-module — Java Spring Boot core (ingestion, rules, console API, BFF)
+  - backend/adapter — Java Spring Boot source adapter (push/buffer/heartbeat)
+  - backend/zabbix-simulator — demo Zabbix-like source
+  - backend/docker-compose.yaml — local stack (Postgres + services)
+  - frontend/ — Angular 18 SPA (console, dashboard, admin, rules)
+  - prototype/ — Vite + React UI prototype (optional / exploratory)
+  - docs/ — requirements, architecture, OpenAPI, page specs
+  - openspec/specs/ — implemented feature specs (preserve existing)
+
+  Read before planning:
+  - AGENTS.md — module map, build and test commands
+  - README.md — product domain, tech stack, Docker setup
+  - docs/requirements.md, docs/architecture.md, docs/pages-spec.md
+  - .cursor/rules/ — git branch/commit, native SQL schema source of truth
+
+  Schema migrations: Liquibase SQL under each service
+  (backend/*/src/main/resources/db/changelog/).
+
+  Development: TDD — write failing test first, implement, refactor (red-green-refactor).
+
+rules:
+  proposal:
+    - Name affected modules (backend/fm-module, backend/adapter, backend/zabbix-simulator, frontend/, prototype/ when relevant)
+    - Note impact on Liquibase SQL, OpenAPI (docs/), and Angular routes if relevant
+    - Include non-goals for scope boundaries
+  specs:
+    - Use Given/When/Then for scenarios
+    - Each scenario should map to at least one automated test (TDD)
+    - Reference existing modules and patterns from AGENTS.md; do not invent new abstractions
+  design:
+    - Split changes by service/layer (adapter / fm-module / Angular UI / optional prototype)
+    - Document integration points (adapter → fm-module ingest, SPA → fm-module REST)
+  tasks:
+    - Follow TDD — add failing test, implement, refactor, green build
+    - Group tasks by module; within each module, test tasks before implementation tasks
+    - Separate tasks for Liquibase SQL, OpenAPI docs, and frontend when touched
+    - Backend tests — mvn test in the module directory (JUnit 5 / Testcontainers)
+    - Frontend unit — cd frontend && npm test (Vitest)
+    - Frontend e2e — cd frontend && npm run test:e2e (Playwright; needs running backend)

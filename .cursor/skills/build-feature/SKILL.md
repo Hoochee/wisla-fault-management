@@ -1,0 +1,37 @@
+---
+name: build-feature
+description: >-
+  Orchestrates WISLA Fault Management feature development from Jira task to tested implementation.
+  Runs phases via specialized agents with gates and OpenSpec integration.
+  Use when user invokes /build-feature or asks to start a feature with WISLA-*.
+disable-model-invocation: true
+---
+
+# Build Feature — WISLA Fault Management (Cursor)
+
+**Delegation:** `task-tool` (Cursor Task, max 4 parallel backend modules)  
+**OpenSpec:** `/opsx:explore`, `/opsx:propose`, `/opsx:apply`, `/opsx:sync`, `/opsx:archive`
+
+## Instructions
+
+1. Load [build-feature/SKILL.core.md](../../build-feature/SKILL.core.md)
+2. If no `.feature-state.json` for the change — run [build-feature/bootstrap.md](../../build-feature/bootstrap.md)
+3. Load [build-feature/delegation/task-tool.md](../../build-feature/delegation/task-tool.md)
+4. Load [build-feature/orchestrator-playbook.md](../../build-feature/orchestrator-playbook.md)
+5. Agent prompts: [.agents/](../../.agents/)
+
+All paths relative to repository root.
+
+## Invocation examples
+
+```
+/build-feature WISLA-12345
+/build-feature console-column-sort
+/build-feature продолжи фичу console-column-sort
+```
+
+## Phases (summary)
+
+`bootstrap` → `discovery` → `design` → `backend` → `backend_review` → `backend_tests` → `frontend` → `frontend_review` → `frontend_tests` → `review` → `done`
+
+State file: `openspec/changes/<changeName>/.feature-state.json`
