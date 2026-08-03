@@ -18,6 +18,16 @@ spring:
           time_zone: UTC
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${WISLA_KAFKA_CONSUMER_GROUP:fm-module-ingestion}
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: record
 
 management:
   endpoints:
@@ -39,3 +49,5 @@ wisla:
     expiration-seconds: ${JWT_EXPIRATION_SECONDS:3600}
   service:
     api-key: ${SERVICE_API_KEY:dev-service-key}
+  kafka:
+    raw-events-topic: ${WISLA_KAFKA_RAW_EVENTS_TOPIC:fm.raw-events}

@@ -11,7 +11,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
         JwtProperties.class,
         ServiceProperties.class,
         AdapterProperties.class,
-        ZabbixSimulatorProperties.class
+        ZabbixSimulatorProperties.class,
+        KafkaIngestProperties.class
 })
 public class AppConfig {
 

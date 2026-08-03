@@ -1,10 +1,10 @@
 package com.wisla.fm.adapter.web;
 
+import com.wisla.fm.adapter.kafka.RawEventPublisher;
 import com.wisla.fm.adapter.persistence.repository.SourceConfigSnapshotRepository;
-import com.wisla.fm.adapter.service.FmModuleClient;
-import com.wisla.fm.adapter.testsupport.FmModuleClientTestConfiguration;
+import com.wisla.fm.adapter.testsupport.RawEventPublisherTestConfiguration;
 import com.wisla.fm.adapter.testsupport.SourceConfigTestData;
-import com.wisla.fm.adapter.testsupport.TestFmModuleClient;
+import com.wisla.fm.adapter.testsupport.TestRawEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -27,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import(FmModuleClientTestConfiguration.class)
+@Import(RawEventPublisherTestConfiguration.class)
 class WebhookControllerTest {
 
     private static final String SOURCE_KEY = "zabbix-prod-01";
@@ -44,11 +45,11 @@ class WebhookControllerTest {
     private PasswordEncoder passwordEncoder;
 
     @Autowired
-    private TestFmModuleClient fmModuleClient;
+    private TestRawEventPublisher rawEventPublisher;
 
     @BeforeEach
     void setUp() {
-        fmModuleClient.resetForwardIngest();
+        rawEventPublisher.reset();
         sourceConfigRepository.deleteAll();
         sourceConfigRepository.save(SourceConfigTestData.snapshot(
                 SOURCE_ID,
@@ -61,8 +62,8 @@ class WebhookControllerTest {
     }
 
     @Test
-    void receiveWebhookForwardsToFmModule() throws Exception {
-        fmModuleClient.stubForwardIngest(new FmModuleClient.IngestResult(true, 202, 12L, null, false));
+    void receiveWebhookPublishesToKafka() throws Exception {
+        rawEventPublisher.stubPublish(RawEventPublisher.PublishResult.ok());
 
         mockMvc.perform(post("/webhook/{sourceKey}", SOURCE_KEY)
                         .header("X-Source-Key", API_KEY)
@@ -72,14 +73,18 @@ class WebhookControllerTest {
                                 """))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.accepted").value(true))
-                .andExpect(jsonPath("$.delivery").value("forwarded"))
-                .andExpect(jsonPath("$.ingest_status").value(202));
+                .andExpect(jsonPath("$.delivery").value("forwarded"));
+
+        assertThat(rawEventPublisher.getPublishCount()).isEqualTo(1);
+        assertThat(rawEventPublisher.getLastSourceId()).isEqualTo(SOURCE_ID);
+        assertThat(rawEventPublisher.getLastSourceKey()).isEqualTo(SOURCE_KEY);
+        assertThat(rawEventPublisher.getLastBody()).containsKey("events");
+        assertThat(rawEventPublisher.getLastBody()).doesNotContainKey("apiKey");
     }
 
     @Test
-    void receiveWebhookBuffersWhenFmModuleUnavailable() throws Exception {
-        fmModuleClient.stubForwardIngest(
-                new FmModuleClient.IngestResult(false, null, 5L, "connection refused", true));
+    void receiveWebhookBuffersWhenKafkaUnavailable() throws Exception {
+        rawEventPublisher.stubPublish(RawEventPublisher.PublishResult.retryable("broker down"));
 
         mockMvc.perform(post("/webhook/{sourceKey}", SOURCE_KEY)
                         .header("X-Source-Key", API_KEY)
@@ -123,7 +128,7 @@ class WebhookControllerTest {
 
     @Test
     void receiveWebhookAcceptsApiKeyFromQueryParameter() throws Exception {
-        fmModuleClient.stubForwardIngest(new FmModuleClient.IngestResult(true, 202, 1L, null, false));
+        rawEventPublisher.stubPublish(RawEventPublisher.PublishResult.ok());
 
         mockMvc.perform(post("/webhook/{sourceKey}", SOURCE_KEY)
                         .param("sourceKey", API_KEY)
@@ -174,6 +179,8 @@ class WebhookControllerTest {
                         .content("{\"event_id\":\"1\",\"severity\":\"low\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("filtered"));
+
+        assertThat(rawEventPublisher.getPublishCount()).isZero();
     }
 
     @Test

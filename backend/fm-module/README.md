@@ -33,6 +33,14 @@ Environment variables (optional):
 | `DATABASE_USER` | `wisla` |
 | `DATABASE_PASSWORD` | `wisla` |
 | `JWT_SECRET` | dev secret (change in production) |
+| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` (compose: `kafka:9092`) |
+| `KAFKA_RAW_EVENTS_TOPIC` | `fm.raw-events` |
+| `KAFKA_CONSUMER_GROUP` | `fm-module-ingestion` |
+
+Kafka consumer for `fm.raw-events` is the production ingest path from adapters; `POST /api/v1/ingest` remains for tests/debug.
+| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` |
+| `WISLA_KAFKA_RAW_EVENTS_TOPIC` | `fm.raw-events` |
+| `WISLA_KAFKA_CONSUMER_GROUP` | `fm-module-ingestion` |
 
 ## MVP endpoints
 
@@ -65,6 +73,9 @@ curl -X POST "http://localhost:8080/api/v1/ingest?sourceKey=demo-source-key" \
   -H "Content-Type: application/json" \
   -d '{"events":[{"externalId":"evt-1","title":"Disk full","severity":"major","occurredAt":"2026-06-23T10:00:00Z"}]}'
 ```
+
+Kafka ingest (production path from adapter): consumer group `fm-module-ingestion` listens on topic `fm.raw-events`.
+HTTP `POST /api/v1/ingest` remains for tests/debug.
 
 ## Package structure (bounded contexts)
 

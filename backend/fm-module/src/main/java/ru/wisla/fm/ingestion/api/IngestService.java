@@ -38,6 +38,14 @@ public class IngestService {
     @Transactional
     public IngestResponse ingest(IngestRequest request, Authentication authentication) {
         UUID sourceId = (UUID) authentication.getPrincipal();
+        return ingest(request, sourceId);
+    }
+
+    /**
+     * Shared ingest entry for HTTP (after API-key auth) and Kafka consumer (trusted {@code sourceId}).
+     */
+    @Transactional
+    public IngestResponse ingest(IngestRequest request, UUID sourceId) {
         EventSourceEntity source = eventSourceRepository.findById(sourceId)
                 .orElseThrow(() -> new IllegalArgumentException("Source not found"));
 

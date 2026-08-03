@@ -12,6 +12,15 @@ spring:
         dialect: org.hibernate.dialect.H2Dialect
   liquibase:
     enabled: false
+  kafka:
+    bootstrap-servers: ${spring.embedded.kafka.brokers:localhost:9092}
+    consumer:
+      group-id: fm-module-ingestion
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    listener:
+      auto-startup: false
+      ack-mode: record
 
 adapter:
   base-url: http://localhost:18081
@@ -27,3 +36,5 @@ wisla:
     expiration-seconds: 3600
   service:
     api-key: test-service-key
+  kafka:
+    raw-events-topic: fm.raw-events

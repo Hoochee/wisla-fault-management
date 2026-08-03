@@ -15,6 +15,14 @@ spring:
           time_zone: UTC
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        spring.json.add.type.headers: false
 
 server:
   port: ${PORT:8081}
@@ -30,6 +38,8 @@ wisla:
     buffer-retry-interval-ms: ${BUFFER_RETRY_INTERVAL_MS:60000}
     fm-module-health-check-enabled: ${FM_MODULE_HEALTH_CHECK:true}
     config-sync-interval-ms: ${CONFIG_SYNC_INTERVAL_MS:300000}
+  kafka:
+    raw-events-topic: ${KAFKA_RAW_EVENTS_TOPIC:fm.raw-events}
 
 management:
   endpoints:
