@@ -58,7 +58,8 @@ Run at the beginning of `/build-feature` when `.feature-state.json` does not exi
      },
      "tests": {
        "backend": "pending",
-       "frontend": "pending"
+       "frontend": "pending",
+       "frontend_e2e": "pending"
      },
      "testFixIterations": {
        "backend": 0,
@@ -70,6 +71,8 @@ Run at the beginning of `/build-feature` when `.feature-state.json` does not exi
      }
    }
    ```
+
+   `tests.frontend_e2e` tracks Playwright e2e (mandatory alongside Vitest whenever frontend is in scope — see `orchestrator-playbook.md#frontend-test-gate`).
 
 6. Advance `phase` to `discovery` and report to user:
    - branch name

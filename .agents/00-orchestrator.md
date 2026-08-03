@@ -55,6 +55,7 @@ Load build-feature/SKILL.core.md for full rules.
 
 - `state.phase === "done"`
 - All tasks in `tasks.md` complete
-- `tests.backend` and `tests.frontend` are `passed` or `skipped`
+- `tests.backend` is `passed` or `skipped`
+- `tests.frontend` and `tests.frontend_e2e` are `passed` or `skipped` (both required together — e2e is not optional when frontend is in scope)
 - User confirmed ready for PR
 - `/opsx:sync` and `/opsx:archive` executed when user confirms merge

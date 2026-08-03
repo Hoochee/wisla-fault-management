@@ -20,7 +20,8 @@ Created by [bootstrap.md](bootstrap.md) at `openspec/changes/<changeName>/.featu
   },
   "tests": {
     "backend": "pending",
-    "frontend": "pending"
+    "frontend": "pending",
+    "frontend_e2e": "pending"
   },
   "testFixIterations": {
     "backend": 0,
@@ -32,6 +33,8 @@ Created by [bootstrap.md](bootstrap.md) at `openspec/changes/<changeName>/.featu
   }
 }
 ```
+
+`tests.frontend_e2e` tracks Playwright e2e separately from Vitest (`tests.frontend`) because they run against different prerequisites (e2e needs a live backend), but both are produced by the same `frontend_tests` phase / same subagent (11-frontend-test-engineer) and gate the **same** transition to `review`. `testFixIterations.frontend` is a shared budget covering fixes to either suite (see [Test fix loop](#test-fix-loop)).
 
 ## Phase transitions
 
@@ -46,19 +49,38 @@ Created by [bootstrap.md](bootstrap.md) at `openspec/changes/<changeName>/.featu
 | backend_tests | Delegate: 08-backend-test-engineer | frontend | **auto:** `mvn test` exit 0 → `tests.backend = passed` |
 | frontend | Delegate: 10-frontend-engineer (skip if no frontend in modules/tasks) | frontend_review | auto |
 | frontend_review | Delegate: 09-code-reviewer (`reviewScope: frontend`) | frontend_tests or frontend | **auto:** approved → tests; changes_requested → fix loop |
-| frontend_tests | Delegate: 11-frontend-test-engineer | review | **auto:** `npm test` exit 0 or skipped |
+| frontend_tests | Delegate: 11-frontend-test-engineer | review | **auto:** `npm test` exit 0 **and** `npm run test:e2e` exit 0 (both required, see [Frontend test gate](#frontend-test-gate)) → `tests.frontend = passed`, `tests.frontend_e2e = passed` |
 | review | User reviews diff; optional manual QA | done | **user:** `approvals.readyForPr = true` |
 | done | `/opsx:sync` + `/opsx:archive` | done | notify user |
 
 **Delegate** = Task tool per [delegation/task-tool.md](delegation/task-tool.md).
+
+### Frontend test gate
+
+The `frontend_tests` phase is **only** complete when both of these are green:
+
+1. `npm test` in `frontend/` (Vitest, unit) → `tests.frontend`
+2. `npm run test:e2e` in `frontend/` (Playwright, e2e) → `tests.frontend_e2e`
+
+Playwright e2e is **mandatory** whenever frontend is in scope — it is no longer conditional on `tasks.md` mentioning it. Do not advance to `review` with only Vitest green.
+
+**Prerequisite — backend must be running** before `npm run test:e2e` (Playwright's `baseURL` defaults to `http://localhost:8080`):
+
+- `cd backend && docker compose up -d --build` — brings up the full stack (Postgres + services + built frontend static), **or**
+- Run backend services individually and `cd frontend && npm start` (`ng serve`, proxies API calls via `proxy.conf.json`), then set `PLAYWRIGHT_BASE_URL=http://localhost:4200` before running `npm run test:e2e`
+
+If the backend cannot be brought up, 11-frontend-test-engineer must report the blocker rather than mark `tests.frontend_e2e` as `passed` or silently `skipped`. Only escalate to the user via the orchestrator (see [Test fix loop](#test-fix-loop)) after exhausting fix iterations.
 
 ### Skipping frontend
 
 If `modules` has no `frontend` / Angular SPA and `tasks.md` has no frontend section:
 
 - Set `tests.frontend = "skipped"`
+- Set `tests.frontend_e2e = "skipped"`
 - Set `codeReview.frontend.status = "skipped"`
 - Advance `backend_tests` → `review` directly (skip `frontend_review`)
+
+`tests.frontend_e2e = "skipped"` is valid **only** in this case (no frontend in scope). It must never be `"skipped"` just because `tasks.md` didn't call out e2e explicitly.
 
 ### Skipping backend
 
@@ -87,6 +109,7 @@ Before archive:
 - All files in `applyRequires` exist and `openspec status` shows apply-ready
 - `mvn test` exit 0 for each backend module in scope (run inside module dir)
 - `npm test` in `frontend/` exit 0 for frontend (Vitest)
+- `npm run test:e2e` in `frontend/` exit 0 for frontend (Playwright) — **required**, not optional; see [Frontend test gate](#frontend-test-gate) for prerequisites
 
 ## Test fix loop
 
@@ -96,7 +119,7 @@ When `tests.backend === "failed"` or subagent reports failures:
 2. If ≤ 3: re-delegate 08-backend-test-engineer with failure log
 3. If > 3: ask user how to proceed
 
-Same for `testFixIterations.frontend` with 11-frontend-test-engineer.
+Same for `testFixIterations.frontend` with 11-frontend-test-engineer — this single counter covers failures in **either** Vitest or Playwright (they are fixed together, in the same subagent run, before re-checking both).
 
 ## Code review loop
 
@@ -151,6 +174,7 @@ Use **`openspec.cmd`** on Windows if `openspec.ps1` is blocked.
 
 - [ ] All tasks in `tasks.md` marked done
 - [ ] Backend tests green (or skipped)
-- [ ] Frontend tests green (or skipped)
+- [ ] Frontend unit tests green (or skipped)
+- [ ] Frontend e2e tests green (or skipped — only when no frontend in scope)
 - [ ] User approved ready for PR
 - [ ] Delta-specs synced and change archived (when user confirms merge)

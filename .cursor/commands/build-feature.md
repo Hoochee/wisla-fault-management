@@ -36,7 +36,7 @@ Orchestrate incremental feature work in WISLA Fault Management using multi-agent
    - **backend_tests**: Task → `.agents/08-backend-test-engineer.md` → auto-gate `mvn test`
    - **frontend**: Task → `.agents/10-frontend-engineer.md` (skip if no frontend)
    - **frontend_review**: Task → `.agents/09-code-reviewer.md` (`reviewScope: frontend`) → fix loop max 3 → escalate
-   - **frontend_tests**: Task → `.agents/11-frontend-test-engineer.md` → auto-gate `npm test`
+   - **frontend_tests**: Task → `.agents/11-frontend-test-engineer.md` → auto-gate `npm test` **and** `npm run test:e2e` (both mandatory, backend must be up for e2e)
    - **review**: show summary → user gate `approvals.readyForPr`
    - **done**: `/opsx:sync` + `/opsx:archive` when user confirms
 
@@ -51,6 +51,7 @@ Orchestrate incremental feature work in WISLA Fault Management using multi-agent
 - Only orchestrator talks to user; subagents via Task tool only
 - Do not skip user-gates (`scope`, `artifacts`, `readyForPr`)
 - Do not mark tests passed without exit code 0
+- Do not mark `frontend_tests` complete with only Vitest green — Playwright e2e (`npm run test:e2e`) is required in the same gate whenever frontend is in scope
 - Max 3 test-fix iterations per test phase — then escalate
 - Max 3 code-review fix iterations per implementation phase — then escalate to user
 - Use `openspec.cmd` on Windows if PowerShell blocks scripts

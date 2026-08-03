@@ -43,10 +43,13 @@ Never advance without user approval for:
 - `approvals.artifacts` may be set after `/opsx:propose` completes all `applyRequires` artifacts (orchestrator verifies files exist)
 - `tests.backend === "passed"` when `mvn test` exits 0 for all listed backend modules
 - `tests.frontend === "passed"` when `npm test` exits 0 in `frontend/` (skip if no frontend tasks)
+- `tests.frontend_e2e === "passed"` when `npm run test:e2e` exits 0 in `frontend/` (Playwright) — **mandatory** whenever frontend is in scope, same gate status as Vitest and `mvn test`; skip only when frontend itself is skipped (no frontend in scope)
+
+The `frontend_tests` phase does not advance to `review` unless **both** `tests.frontend` and `tests.frontend_e2e` are `"passed"` (or both `"skipped"`). E2E requires the backend to be reachable first — see `orchestrator-playbook.md#frontend-test-gate` for how to bring it up (`docker compose up -d --build`, or `ng serve` + `PLAYWRIGHT_BASE_URL`).
 
 ### Test fix loop
 
-- Max **3** iterations per `backend` and `frontend` test phase
+- Max **3** iterations per `backend` and `frontend` test phase (the `frontend` budget covers both Vitest and Playwright failures)
 - After 3 failures — escalate to user with logs
 
 ### Code review loop
@@ -100,4 +103,5 @@ When multiple backend modules in `state.modules`:
 - Treat `prototype/` as production UI unless tasks explicitly require it
 - Run deploy/SSH steps (out of scope for feature workflow)
 - Mark tests passed without verified exit code 0
+- Treat Playwright e2e as optional when frontend is in scope — it is a required gate alongside Vitest
 - Overwrite existing `openspec/specs/**` outside `/opsx:sync`
