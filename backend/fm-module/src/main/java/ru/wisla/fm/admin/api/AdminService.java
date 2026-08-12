@@ -27,7 +27,7 @@ import ru.wisla.fm.identity.domain.RoleEntity;
 import ru.wisla.fm.identity.domain.UserEntity;
 import ru.wisla.fm.identity.persistence.RoleRepository;
 import ru.wisla.fm.identity.persistence.UserRepository;
-import ru.wisla.fm.processing.persistence.EventRepository;
+import ru.wisla.fm.processing.adapter.out.persistence.EventJpaRepository;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -44,7 +44,7 @@ public class AdminService {
     private final ConfigurationItemRepository configurationItemRepository;
     private final ProductRepository productRepository;
     private final ProductCiRepository productCiRepository;
-    private final EventRepository eventRepository;
+    private final EventJpaRepository eventRepository;
     private final AuthService authService;
     private final AuthorizationService authorizationService;
     private final PasswordEncoder passwordEncoder;
@@ -56,7 +56,7 @@ public class AdminService {
                         ConfigurationItemRepository configurationItemRepository,
                         ProductRepository productRepository,
                         ProductCiRepository productCiRepository,
-                        EventRepository eventRepository,
+                        EventJpaRepository eventRepository,
                         AuthService authService,
                         AuthorizationService authorizationService,
                         PasswordEncoder passwordEncoder,

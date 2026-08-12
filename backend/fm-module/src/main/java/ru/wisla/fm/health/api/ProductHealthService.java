@@ -12,8 +12,8 @@ import ru.wisla.fm.cmdb.persistence.ProductRepository;
 import ru.wisla.fm.common.api.NotFoundException;
 import ru.wisla.fm.processing.api.EventDto;
 import ru.wisla.fm.processing.api.EventQueryService;
-import ru.wisla.fm.processing.domain.EventEntity;
-import ru.wisla.fm.processing.persistence.EventRepository;
+import ru.wisla.fm.processing.adapter.out.persistence.EventJpaEntity;
+import ru.wisla.fm.processing.adapter.out.persistence.EventJpaRepository;
 
 import java.util.Comparator;
 import java.util.HashMap;
@@ -31,7 +31,7 @@ public class ProductHealthService {
     private final ProductRepository productRepository;
     private final ProductCiRepository productCiRepository;
     private final ConfigurationItemRepository configurationItemRepository;
-    private final EventRepository eventRepository;
+    private final EventJpaRepository eventRepository;
     private final EventQueryService eventQueryService;
     private final CmdbMapper cmdbMapper;
     private final ObjectMapper objectMapper;
@@ -39,7 +39,7 @@ public class ProductHealthService {
     public ProductHealthService(ProductRepository productRepository,
                                 ProductCiRepository productCiRepository,
                                 ConfigurationItemRepository configurationItemRepository,
-                                EventRepository eventRepository,
+                                EventJpaRepository eventRepository,
                                 EventQueryService eventQueryService,
                                 CmdbMapper cmdbMapper,
                                 ObjectMapper objectMapper) {
@@ -69,7 +69,7 @@ public class ProductHealthService {
         List<ConfigurationItemDto> cis = configurationItemRepository.findAllById(ciIds).stream()
                 .map(ci -> cmdbMapper.toDto(ci, productCiRepository.findProductIdsByCiId(ci.getId())))
                 .toList();
-        List<EventEntity> activeEvents = ciIds.isEmpty() ? List.of() : eventRepository.findActiveByCiIds(ciIds);
+        List<EventJpaEntity> activeEvents = ciIds.isEmpty() ? List.of() : eventRepository.findActiveByCiIds(ciIds);
         List<EventDto> eventDtos = activeEvents.stream().map(eventQueryService::toDto).toList();
         Map<String, Integer> breakdown = severityBreakdown(activeEvents);
         return ProductHealthDetailDto.from(health, cis, eventDtos, breakdown);
@@ -77,7 +77,7 @@ public class ProductHealthService {
 
     private ProductHealthDto toProductHealth(ProductEntity product) {
         List<UUID> ciIds = productCiRepository.findCiIdsByProductId(product.getId());
-        List<EventEntity> activeEvents = ciIds.isEmpty() ? List.of() : eventRepository.findActiveByCiIds(ciIds);
+        List<EventJpaEntity> activeEvents = ciIds.isEmpty() ? List.of() : eventRepository.findActiveByCiIds(ciIds);
         String maxSeverity = activeEvents.isEmpty() ? "normal" : maxSeverity(activeEvents);
         return new ProductHealthDto(
                 product.getId(),
@@ -91,19 +91,19 @@ public class ProductHealthService {
         );
     }
 
-    private String maxSeverity(List<EventEntity> events) {
+    private String maxSeverity(List<EventJpaEntity> events) {
         return events.stream()
-                .map(EventEntity::getSeverity)
+                .map(EventJpaEntity::getSeverity)
                 .min(Comparator.comparingInt(SEVERITY_ORDER::indexOf))
                 .orElse("normal");
     }
 
-    private Map<String, Integer> severityBreakdown(List<EventEntity> events) {
+    private Map<String, Integer> severityBreakdown(List<EventJpaEntity> events) {
         Map<String, Integer> counts = new HashMap<>();
         for (String severity : SEVERITY_ORDER) {
             counts.put(severity, 0);
         }
-        for (EventEntity event : events) {
+        for (EventJpaEntity event : events) {
             counts.merge(event.getSeverity(), 1, Integer::sum);
         }
         return counts;

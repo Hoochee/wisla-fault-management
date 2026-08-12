@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
-import ru.wisla.fm.processing.persistence.EventRepository;
+import ru.wisla.fm.processing.adapter.out.persistence.EventJpaRepository;
 import ru.wisla.fm.rules.persistence.ProcessingRuleRepository;
 import ru.wisla.fm.support.AbstractFmModuleTest;
 
@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class RuleCanvasRuntimeIntegrationTest extends AbstractFmModuleTest {
 
-    @Autowired private EventRepository eventRepository;
+    @Autowired private EventJpaRepository eventRepository;
     @Autowired private ProcessingRuleRepository processingRuleRepository;
 
     @Test

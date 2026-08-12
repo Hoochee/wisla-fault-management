@@ -1,6 +1,6 @@
 package com.wisla.fm.adapter.testsupport;
 
-import com.wisla.fm.adapter.persistence.entity.SourceConfigSnapshot;
+import com.wisla.fm.adapter.ingest.adapter.out.persistence.SourceConfigSnapshotJpaEntity;
 
 import java.lang.reflect.Field;
 import java.time.Instant;
@@ -12,7 +12,7 @@ public final class SourceConfigTestData {
     private SourceConfigTestData() {
     }
 
-    public static SourceConfigSnapshot snapshot(
+    public static SourceConfigSnapshotJpaEntity snapshot(
             UUID sourceId,
             String sourceKey,
             String apiKeyHash,
@@ -34,7 +34,7 @@ public final class SourceConfigTestData {
         );
     }
 
-    public static SourceConfigSnapshot snapshot(
+    public static SourceConfigSnapshotJpaEntity snapshot(
             UUID sourceId,
             String sourceKey,
             String apiKeyHash,
@@ -46,9 +46,9 @@ public final class SourceConfigTestData {
             Instant updatedAt
     ) {
         try {
-            var constructor = SourceConfigSnapshot.class.getDeclaredConstructor();
+            var constructor = SourceConfigSnapshotJpaEntity.class.getDeclaredConstructor();
             constructor.setAccessible(true);
-            SourceConfigSnapshot entity = constructor.newInstance();
+            SourceConfigSnapshotJpaEntity entity = constructor.newInstance();
             set(entity, "sourceId", sourceId);
             set(entity, "sourceKey", sourceKey);
             set(entity, "apiKeyHash", apiKeyHash);

@@ -1,13 +1,13 @@
 package com.wisla.fm.adapter.testsupport;
 
-import com.wisla.fm.adapter.kafka.RawEventPublisher;
+import com.wisla.fm.adapter.ingest.application.port.out.RawEventPublisherPort;
 
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-public class TestRawEventPublisher implements RawEventPublisher {
+public class TestRawEventPublisher implements RawEventPublisherPort {
 
     private final AtomicReference<PublishResult> nextResult = new AtomicReference<>(PublishResult.ok());
     private final AtomicInteger publishCount = new AtomicInteger();

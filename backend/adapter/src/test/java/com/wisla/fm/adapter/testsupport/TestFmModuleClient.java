@@ -1,6 +1,6 @@
 package com.wisla.fm.adapter.testsupport;
 
-import com.wisla.fm.adapter.service.FmModuleClient;
+import com.wisla.fm.adapter.ingest.adapter.out.http.FmModuleClient;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
