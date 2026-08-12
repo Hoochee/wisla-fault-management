@@ -1,0 +1,4 @@
+﻿services:
+  kafka:
+    extra_hosts:
+      - "kafka:127.0.0.1"
