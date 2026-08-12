@@ -1,5 +1,5 @@
 {
-  "phase": "review",
+  "phase": "done",
   "jiraKey": null,
   "changeName": "hexagonal-refactor",
   "branch": "feature/WISLA-refactor",
@@ -7,7 +7,7 @@
   "approvals": {
     "scope": true,
     "artifacts": true,
-    "readyForPr": false
+    "readyForPr": true
   },
   "tests": {
     "backend": "passed",
