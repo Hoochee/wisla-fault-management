@@ -22,7 +22,7 @@ import ru.wisla.fm.config.AdapterProperties;
 import ru.wisla.fm.config.ZabbixSimulatorProperties;
 import ru.wisla.fm.configuration.domain.EventSourceEntity;
 import ru.wisla.fm.configuration.persistence.EventSourceRepository;
-import ru.wisla.fm.processing.persistence.EventRepository;
+import ru.wisla.fm.processing.adapter.out.persistence.EventJpaRepository;
 
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -38,7 +38,7 @@ public class SourceService {
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final EventSourceRepository eventSourceRepository;
-    private final EventRepository eventRepository;
+    private final EventJpaRepository eventRepository;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
     private final AdapterProperties adapterProperties;
@@ -47,7 +47,7 @@ public class SourceService {
     private final ZabbixSimulatorClient zabbixSimulatorClient;
 
     public SourceService(EventSourceRepository eventSourceRepository,
-                         EventRepository eventRepository,
+                         EventJpaRepository eventRepository,
                          PasswordEncoder passwordEncoder,
                          ObjectMapper objectMapper,
                          AdapterProperties adapterProperties,

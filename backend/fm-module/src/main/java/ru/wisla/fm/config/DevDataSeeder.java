@@ -18,8 +18,8 @@ import ru.wisla.fm.identity.domain.RoleEntity;
 import ru.wisla.fm.identity.domain.UserEntity;
 import ru.wisla.fm.identity.persistence.RoleRepository;
 import ru.wisla.fm.identity.persistence.UserRepository;
-import ru.wisla.fm.processing.domain.EventEntity;
-import ru.wisla.fm.processing.persistence.EventRepository;
+import ru.wisla.fm.processing.adapter.out.persistence.EventJpaEntity;
+import ru.wisla.fm.processing.adapter.out.persistence.EventJpaRepository;
 import ru.wisla.fm.rules.domain.ProcessingRuleEntity;
 import ru.wisla.fm.rules.persistence.ProcessingRuleRepository;
 import ru.wisla.fm.settings.domain.ModuleSettingsEntity;
@@ -41,7 +41,7 @@ public class DevDataSeeder implements ApplicationRunner {
     private final ConfigurationItemRepository configurationItemRepository;
     private final ProductRepository productRepository;
     private final ProductCiRepository productCiRepository;
-    private final EventRepository eventRepository;
+    private final EventJpaRepository eventRepository;
     private final ModuleSettingsRepository moduleSettingsRepository;
     private final PasswordEncoder passwordEncoder;
 
@@ -52,7 +52,7 @@ public class DevDataSeeder implements ApplicationRunner {
                          ConfigurationItemRepository configurationItemRepository,
                          ProductRepository productRepository,
                          ProductCiRepository productCiRepository,
-                         EventRepository eventRepository,
+                         EventJpaRepository eventRepository,
                          ModuleSettingsRepository moduleSettingsRepository,
                          PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
@@ -283,7 +283,7 @@ public class DevDataSeeder implements ApplicationRunner {
         if (ci == null || source == null) {
             return;
         }
-        EventEntity event = new EventEntity();
+        EventJpaEntity event = new EventJpaEntity();
         event.setStatus("new");
         event.setSeverity("major");
         event.setTitle("Demo health degradation");

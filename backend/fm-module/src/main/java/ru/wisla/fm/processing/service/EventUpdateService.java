@@ -8,8 +8,8 @@ import ru.wisla.fm.common.api.NotFoundException;
 import ru.wisla.fm.processing.api.EventDto;
 import ru.wisla.fm.processing.api.EventPatch;
 import ru.wisla.fm.processing.api.EventQueryService;
-import ru.wisla.fm.processing.domain.EventEntity;
-import ru.wisla.fm.processing.persistence.EventRepository;
+import ru.wisla.fm.processing.adapter.out.persistence.EventJpaEntity;
+import ru.wisla.fm.processing.adapter.out.persistence.EventJpaRepository;
 
 import java.time.Instant;
 import java.util.List;
@@ -18,11 +18,11 @@ import java.util.UUID;
 @Service
 public class EventUpdateService {
 
-    private final EventRepository eventRepository;
+    private final EventJpaRepository eventRepository;
     private final EventQueryService eventQueryService;
     private final ObjectMapper objectMapper;
 
-    public EventUpdateService(EventRepository eventRepository,
+    public EventUpdateService(EventJpaRepository eventRepository,
                               EventQueryService eventQueryService,
                               ObjectMapper objectMapper) {
         this.eventRepository = eventRepository;
@@ -32,7 +32,7 @@ public class EventUpdateService {
 
     @Transactional
     public EventDto patchEvent(UUID id, EventPatch patch) {
-        EventEntity event = eventRepository.findById(id)
+        EventJpaEntity event = eventRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Event not found"));
 
         if (patch.status() != null) {

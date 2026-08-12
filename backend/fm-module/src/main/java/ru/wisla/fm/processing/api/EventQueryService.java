@@ -14,10 +14,10 @@ import ru.wisla.fm.configuration.persistence.EventSourceRepository;
 import ru.wisla.fm.identity.persistence.UserRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import ru.wisla.fm.processing.domain.EventActionLogEntity;
-import ru.wisla.fm.processing.domain.EventEntity;
-import ru.wisla.fm.processing.persistence.EventActionLogRepository;
-import ru.wisla.fm.processing.persistence.EventRepository;
+import ru.wisla.fm.processing.adapter.out.persistence.EventActionLogJpaEntity;
+import ru.wisla.fm.processing.adapter.out.persistence.EventActionLogJpaRepository;
+import ru.wisla.fm.processing.adapter.out.persistence.EventJpaEntity;
+import ru.wisla.fm.processing.adapter.out.persistence.EventJpaRepository;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -33,14 +33,14 @@ public class EventQueryService {
             "createdAt", "lastRepeatAt", "repeatCount", "severity", "status", "title", "nodeFqdn", "systemName"
     );
 
-    private final EventRepository eventRepository;
-    private final EventActionLogRepository eventActionLogRepository;
+    private final EventJpaRepository eventRepository;
+    private final EventActionLogJpaRepository eventActionLogRepository;
     private final EventSourceRepository eventSourceRepository;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
 
-    public EventQueryService(EventRepository eventRepository,
-                             EventActionLogRepository eventActionLogRepository,
+    public EventQueryService(EventJpaRepository eventRepository,
+                             EventActionLogJpaRepository eventActionLogRepository,
                              EventSourceRepository eventSourceRepository,
                              UserRepository userRepository,
                              ObjectMapper objectMapper) {
@@ -56,7 +56,7 @@ public class EventQueryService {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 500);
 
-        Specification<EventEntity> spec = buildSpec(status, severity, sourceId, ciId);
+        Specification<EventJpaEntity> spec = buildSpec(status, severity, sourceId, ciId);
         PageRequest pageable;
         if ("severity".equals(parsedSort.field())) {
             spec = spec.and(severitySortSpec(parsedSort.ascending()));
@@ -68,7 +68,7 @@ public class EventQueryService {
             pageable = PageRequest.of(safePage, safeSize, buildSort(parsedSort));
         }
 
-        Page<EventEntity> result = eventRepository.findAll(spec, pageable);
+        Page<EventJpaEntity> result = eventRepository.findAll(spec, pageable);
         return new EventPage(
                 result.getContent().stream().map(this::toDto).toList(),
                 PageMeta.of(result.getNumber(), result.getSize(), result.getTotalElements())
@@ -76,22 +76,22 @@ public class EventQueryService {
     }
 
     public EventDetailDto getEvent(UUID id) {
-        EventEntity event = eventRepository.findById(id)
+        EventJpaEntity event = eventRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Event not found"));
         List<EventActionLogDto> logs = eventActionLogRepository.findByEventIdOrderByCreatedAtDesc(id).stream()
                 .map(this::toLogDto)
                 .toList();
         List<UUID> childIds = eventRepository.findByRootEventId(id).stream()
-                .map(EventEntity::getId)
+                .map(EventJpaEntity::getId)
                 .toList();
         return new EventDetailDto(toDto(event, childIds), logs, event.getRawEventId());
     }
 
-    public EventDto toDto(EventEntity event) {
+    public EventDto toDto(EventJpaEntity event) {
         return toDto(event, List.of());
     }
 
-    public EventDto toDto(EventEntity event, List<UUID> childEventIds) {
+    public EventDto toDto(EventJpaEntity event, List<UUID> childEventIds) {
         String sourceName = eventSourceRepository.findById(event.getSourceId())
                 .map(source -> source.getName())
                 .orElse(null);
@@ -128,7 +128,7 @@ public class EventQueryService {
         );
     }
 
-    private EventActionLogDto toLogDto(EventActionLogEntity log) {
+    private EventActionLogDto toLogDto(EventActionLogJpaEntity log) {
         return new EventActionLogDto(
                 log.getId(),
                 log.getEventId(),
@@ -151,7 +151,7 @@ public class EventQueryService {
         }
     }
 
-    private Specification<EventEntity> buildSpec(String status, String severity, UUID sourceId, UUID ciId) {
+    private Specification<EventJpaEntity> buildSpec(String status, String severity, UUID sourceId, UUID ciId) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (status != null && !status.isBlank()) {
@@ -192,7 +192,7 @@ public class EventQueryService {
         return Sort.by(direction, parsedSort.field());
     }
 
-    private Specification<EventEntity> lastRepeatAtSortSpec(boolean ascending) {
+    private Specification<EventJpaEntity> lastRepeatAtSortSpec(boolean ascending) {
         return (root, query, cb) -> {
             if (!Long.class.equals(query.getResultType()) && !long.class.equals(query.getResultType())) {
                 Expression<Integer> nullRank = cb.<Integer>selectCase()
@@ -207,7 +207,7 @@ public class EventQueryService {
         };
     }
 
-    private Specification<EventEntity> severitySortSpec(boolean ascending) {
+    private Specification<EventJpaEntity> severitySortSpec(boolean ascending) {
         return (root, query, cb) -> {
             if (!Long.class.equals(query.getResultType()) && !long.class.equals(query.getResultType())) {
                 Expression<Integer> rank = cb.<Integer>selectCase()

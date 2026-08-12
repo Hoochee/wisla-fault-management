@@ -12,10 +12,10 @@ import ru.wisla.fm.processing.api.EventActionRequest;
 import ru.wisla.fm.processing.api.EventActionResult;
 import ru.wisla.fm.processing.api.EventDto;
 import ru.wisla.fm.processing.api.EventQueryService;
-import ru.wisla.fm.processing.domain.EventActionLogEntity;
-import ru.wisla.fm.processing.domain.EventEntity;
-import ru.wisla.fm.processing.persistence.EventActionLogRepository;
-import ru.wisla.fm.processing.persistence.EventRepository;
+import ru.wisla.fm.processing.adapter.out.persistence.EventActionLogJpaEntity;
+import ru.wisla.fm.processing.adapter.out.persistence.EventActionLogJpaRepository;
+import ru.wisla.fm.processing.adapter.out.persistence.EventJpaEntity;
+import ru.wisla.fm.processing.adapter.out.persistence.EventJpaRepository;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -23,14 +23,14 @@ import java.util.UUID;
 @Service
 public class EventActionService {
 
-    private final EventRepository eventRepository;
-    private final EventActionLogRepository eventActionLogRepository;
+    private final EventJpaRepository eventRepository;
+    private final EventActionLogJpaRepository eventActionLogRepository;
     private final UserRepository userRepository;
     private final EventQueryService eventQueryService;
     private final ObjectMapper objectMapper;
 
-    public EventActionService(EventRepository eventRepository,
-                              EventActionLogRepository eventActionLogRepository,
+    public EventActionService(EventJpaRepository eventRepository,
+                              EventActionLogJpaRepository eventActionLogRepository,
                               UserRepository userRepository,
                               EventQueryService eventQueryService,
                               ObjectMapper objectMapper) {
@@ -43,7 +43,7 @@ public class EventActionService {
 
     @Transactional
     public EventActionResult performAction(UUID eventId, EventActionRequest request, Authentication authentication) {
-        EventEntity event = eventRepository.findById(eventId)
+        EventJpaEntity event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Event not found"));
         UUID userId = authentication != null ? (UUID) authentication.getPrincipal() : null;
         String userName = resolveUserName(userId);
@@ -75,8 +75,8 @@ public class EventActionService {
             default -> throw new IllegalArgumentException("Unsupported action: " + action);
         }
 
-        EventEntity saved = eventRepository.save(event);
-        EventActionLogEntity log = new EventActionLogEntity();
+        EventJpaEntity saved = eventRepository.save(event);
+        EventActionLogJpaEntity log = new EventActionLogJpaEntity();
         log.setEventId(saved.getId());
         log.setAction(action);
         log.setUserId(userId);
@@ -85,7 +85,7 @@ public class EventActionService {
         if (request.comment() != null && !request.comment().isBlank()) {
             log.setMetadata(toMetadata(request.comment()));
         }
-        EventActionLogEntity savedLog = eventActionLogRepository.save(log);
+        EventActionLogJpaEntity savedLog = eventActionLogRepository.save(log);
 
         EventDto eventDto = eventQueryService.toDto(saved);
         return new EventActionResult(eventDto, toLogDto(savedLog));
@@ -117,7 +117,7 @@ public class EventActionService {
         }
     }
 
-    private EventActionLogDto toLogDto(EventActionLogEntity log) {
+    private EventActionLogDto toLogDto(EventActionLogJpaEntity log) {
         return new EventActionLogDto(
                 log.getId(),
                 log.getEventId(),

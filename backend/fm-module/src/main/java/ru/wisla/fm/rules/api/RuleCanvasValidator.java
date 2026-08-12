@@ -6,10 +6,6 @@ import org.springframework.stereotype.Component;
 
 import ru.wisla.fm.common.api.ErrorResponse;
 
-import ru.wisla.fm.processing.canvas.CanvasEdgeView;
-
-import ru.wisla.fm.processing.canvas.CanvasNodeView;
-
 
 
 import java.util.ArrayDeque;

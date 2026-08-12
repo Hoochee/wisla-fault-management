@@ -7,7 +7,7 @@ import ru.wisla.fm.cmdb.domain.ProductEntity;
 import ru.wisla.fm.cmdb.persistence.ProductRepository;
 import ru.wisla.fm.console.domain.EventMapEntity;
 import ru.wisla.fm.console.persistence.EventMapRepository;
-import ru.wisla.fm.processing.persistence.EventRepository;
+import ru.wisla.fm.processing.adapter.out.persistence.EventJpaRepository;
 
 import java.util.HashMap;
 import java.util.List;
@@ -19,12 +19,12 @@ public class DashboardService {
 
     private static final List<String> SEVERITIES = List.of("fatal", "critical", "major", "minor", "warning", "normal");
 
-    private final EventRepository eventRepository;
+    private final EventJpaRepository eventRepository;
     private final ProductRepository productRepository;
     private final EventMapRepository eventMapRepository;
     private final ObjectMapper objectMapper;
 
-    public DashboardService(EventRepository eventRepository,
+    public DashboardService(EventJpaRepository eventRepository,
                             ProductRepository productRepository,
                             EventMapRepository eventMapRepository,
                             ObjectMapper objectMapper) {
