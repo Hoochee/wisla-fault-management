@@ -196,6 +196,125 @@ class ProductAdminControllerTest extends AbstractFmModuleTest {
         .andExpect(jsonPath("$.configurationItems[0].id").value(ciId));
   }
 
+  @Test
+  void patchComponentsReplacesSlots() throws Exception {
+    String token = obtainAdminToken();
+    String productId = createProduct(token, "comp-product-" + UUID.randomUUID().toString().substring(0, 8));
+    String ciPower = createConfigurationItem(token, "power-" + UUID.randomUUID() + ".wisla.local");
+    String ciCpu = createConfigurationItem(token, "cpu-" + UUID.randomUUID() + ".wisla.local");
+
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/products/" + productId)
+                .header("Authorization", bearer(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "components",
+                    List.of(
+                        Map.of("code", "POWER", "name", "POWER", "weight", 20, "influenceType", "critical", "ciIds", List.of(ciPower)),
+                        Map.of("code", "CPU", "name", "CPU", "weight", 80, "influenceType", "weighted", "ciIds", List.of(ciCpu))
+                    )))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.components.length()").value(2))
+        .andExpect(jsonPath("$.components[0].code").value("POWER"))
+        .andExpect(jsonPath("$.components[0].weight").value(20));
+  }
+
+  @Test
+  void omitComponentsLeavesSlotsUnchanged() throws Exception {
+    String token = obtainAdminToken();
+    String productId = createProduct(token, "omit-product-" + UUID.randomUUID().toString().substring(0, 8));
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/products/" + productId)
+                .header("Authorization", bearer(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "components",
+                    List.of(Map.of("code", "POWER", "name", "POWER", "weight", 100, "influenceType", "weighted"))))))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/products/" + productId)
+                .header("Authorization", bearer(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("name", "Renamed"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.name").value("Renamed"))
+        .andExpect(jsonPath("$.components.length()").value(1))
+        .andExpect(jsonPath("$.components[0].code").value("POWER"));
+  }
+
+  @Test
+  void zeroTotalWeightReturns400() throws Exception {
+    String token = obtainAdminToken();
+    String productId = createProduct(token, "zero-product-" + UUID.randomUUID().toString().substring(0, 8));
+
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/products/" + productId)
+                .header("Authorization", bearer(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "components",
+                    List.of(Map.of("code", "CPU", "name", "CPU", "weight", 0, "influenceType", "weighted"))))))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void ciOnTwoComponentsReturns400() throws Exception {
+    String token = obtainAdminToken();
+    String productId = createProduct(token, "dupci-product-" + UUID.randomUUID().toString().substring(0, 8));
+    String ciId = createConfigurationItem(token, "dup-" + UUID.randomUUID() + ".wisla.local");
+
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/products/" + productId)
+                .header("Authorization", bearer(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "components",
+                    List.of(
+                        Map.of("code", "POWER", "name", "POWER", "weight", 50, "influenceType", "critical", "ciIds", List.of(ciId)),
+                        Map.of("code", "CPU", "name", "CPU", "weight", 50, "influenceType", "weighted", "ciIds", List.of(ciId))
+                    )))))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void patchCiIdsBindsNewCiToCommon() throws Exception {
+    String token = obtainAdminToken();
+    String ciId = createConfigurationItem(token, "common-ci-" + UUID.randomUUID() + ".wisla.local");
+    String productId = createProduct(token, "common-product-" + UUID.randomUUID().toString().substring(0, 8));
+
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/products/" + productId)
+                .header("Authorization", bearer(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("ciIds", List.of(ciId)))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.components[?(@.code == 'COMMON')].ciIds[0]").value(ciId));
+  }
+
+  @Test
+  void patchComponentsWithoutAdminReturns403() throws Exception {
+    String operatorToken = obtainOperatorToken();
+    String adminToken = obtainAdminToken();
+    String productId = createProduct(adminToken, "forbid-comp-" + UUID.randomUUID().toString().substring(0, 8));
+
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/products/" + productId)
+                .header("Authorization", bearer(operatorToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "components",
+                    List.of(Map.of("code", "CPU", "name", "CPU", "weight", 100, "influenceType", "weighted"))))))
+        .andExpect(status().isForbidden());
+  }
+
   private String createProduct(String token, String code) throws Exception {
     Map<String, Object> create =
         Map.of("name", "Product " + code, "code", code, "tenant", "moscow", "site", "dc1");

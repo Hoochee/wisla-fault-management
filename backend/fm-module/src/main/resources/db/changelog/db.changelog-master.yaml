@@ -21,3 +21,5 @@ databaseChangeLog:
       file: db/changelog/changes/011-settings.sql
   - include:
       file: db/changelog/changes/012-rule-push-notifications.sql
+  - include:
+      file: db/changelog/changes/013-product-health.sql

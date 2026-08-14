@@ -1,0 +1,31 @@
+{
+  "phase": "review",
+  "jiraKey": "FM-product-health",
+  "changeName": "product-health-graph",
+  "branch": "feature/FM-product-health",
+  "modules": [
+    "backend/fm-module",
+    "backend/adapter",
+    "frontend",
+    "demo/gift-shop",
+    "docs"
+  ],
+  "approvals": {
+    "scope": true,
+    "artifacts": true,
+    "readyForPr": false
+  },
+  "tests": {
+    "backend": "passed",
+    "frontend": "passed",
+    "frontend_e2e": "passed"
+  },
+  "testFixIterations": {
+    "backend": 0,
+    "frontend": 0
+  },
+  "codeReview": {
+    "backend": { "status": "approved", "iterations": 0 },
+    "frontend": { "status": "approved", "iterations": 0 }
+  }
+}

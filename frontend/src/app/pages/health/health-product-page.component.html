@@ -18,8 +18,10 @@
         }
         <div class="stats">
           <app-severity-badge [severity]="product.maxSeverity" />
-          <div class="count">{{ product.activeEventCount }}</div>
-          <div class="hint">активных событий</div>
+          <div class="count" [style.color]="getHealthPercentColor(product.healthPercent ?? 100)">
+            {{ product.healthPercent ?? '—' }}%
+          </div>
+          <div class="hint">здоровье · ущерб {{ product.damagePercent ?? '—' }}%</div>
         </div>
       </div>
     </div>
@@ -63,6 +65,64 @@
           }
         </tbody>
       </table>
+    </section>
+
+    <section class="health-graph">
+      <app-monq-health-graph [product]="product" />
+
+      <div class="card components-card">
+        <h3>Компоненты</h3>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Компонент</th>
+              <th>Здоровье</th>
+              <th class="num">Ущерб</th>
+              <th class="num">Вес</th>
+              <th>Влияние</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of product.components ?? []; track c.code) {
+              <tr>
+                <td>{{ c.name }}</td>
+                <td>
+                  <app-health-badge
+                    [level]="percentToLevel(c.healthPercent)"
+                    [percent]="c.healthPercent"
+                    [compact]="true"
+                  />
+                </td>
+                <td class="num">{{ c.damagePercent }}%</td>
+                <td class="num">{{ c.weight ?? '—' }}</td>
+                <td>{{ c.influenceType === 'critical' ? 'Критический' : 'Взвешенный' }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="empty-row">Нет данных компонентов</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (graphError && !hasSankeyGraph(product.sankey)) {
+        <p class="empty-row">Нет данных графа здоровья</p>
+      }
+
+      @if (historyError) {
+        <p class="empty-row">Не удалось загрузить историю здоровья</p>
+      }
+      <app-health-history-heatmap [buckets]="history" />
+
+      <app-component-weight-editor
+        [components]="editorComponents"
+        [cis]="ciList"
+        [editable]="isAdmin()"
+        [saving]="saving()"
+        [error]="weightError()"
+        (saveComponents)="saveComponentWeights($event)"
+      />
     </section>
 
     <div class="ci-strip">

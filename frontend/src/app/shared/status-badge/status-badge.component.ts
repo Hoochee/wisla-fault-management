@@ -23,12 +23,12 @@ const STATUS_LABELS: Record<EventStatus, string> = {
         font-size: 11px;
         font-weight: 500;
       }
-      .new { background: #1e3a5f; color: #4a9eff; }
-      .in_progress { background: #3d3520; color: #ffc107; }
-      .closed { background: #2a2f3a; color: #9e9e9e; }
-      .archived { background: #2a2f3a; color: #757575; }
-      .maintenance { background: #1b3d2f; color: #4caf50; }
-      .deferred { background: #3d2a1b; color: #ff9800; }
+      .new { background: #e8f0fe; color: var(--accent); }
+      .in_progress { background: #fff8e1; color: #b45309; }
+      .closed { background: #f3f4f6; color: var(--text-muted); }
+      .archived { background: #f3f4f6; color: var(--text-muted); }
+      .maintenance { background: #e8f5e9; color: #15803d; }
+      .deferred { background: #fff3e0; color: #c2410c; }
     `,
   ],
 })

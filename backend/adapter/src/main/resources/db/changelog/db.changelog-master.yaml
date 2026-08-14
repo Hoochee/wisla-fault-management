@@ -7,3 +7,5 @@ databaseChangeLog:
       file: db/changelog/changes/003-source-config-source-key.sql
   - include:
       file: db/changelog/changes/004-buffered-messages-ingest-api-key.sql
+  - include:
+      file: db/changelog/changes/005-pull-etl.sql

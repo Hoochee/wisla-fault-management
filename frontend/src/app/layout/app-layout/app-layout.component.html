@@ -31,7 +31,7 @@
         <div class="nav-group">
           @if (item.children) {
             <button type="button" class="nav-parent" (click)="toggleSection(item.label)">
-              <span>{{ item.icon }}</span>
+              <span class="nav-icon">{{ item.icon }}</span>
               @if (!collapsed()) {
                 <span class="nav-label">{{ item.label }}</span>
                 <span class="chevron">{{ isExpanded(item.label) ? '▾' : '▸' }}</span>
@@ -58,7 +58,7 @@
               class="nav-item"
               [class.post-mvp]="item.postMvp"
             >
-              <span>{{ item.icon }}</span>
+              <span class="nav-icon">{{ item.icon }}</span>
               @if (!collapsed()) {
                 <span class="nav-label">{{ item.label }}</span>
                 @if (item.postMvp) { <span class="mvp-tag">post-MVP</span> }

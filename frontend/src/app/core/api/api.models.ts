@@ -269,6 +269,43 @@ export interface ProcessingRuleDetail extends ProcessingRule {
   canvas?: RuleCanvas;
 }
 
+export type ComponentInfluenceType = 'weighted' | 'critical';
+
+export interface ComponentHealth {
+  code: string;
+  name: string;
+  healthPercent: number;
+  damagePercent: number;
+  weight?: number;
+  influenceType?: ComponentInfluenceType | string;
+  ciIds?: string[];
+}
+
+export interface SankeyNode {
+  id: string;
+  label: string;
+  kind: string;
+}
+
+export interface SankeyLink {
+  from: string;
+  to: string;
+  damage: number;
+}
+
+export interface SankeyGraph {
+  nodes: SankeyNode[];
+  links: SankeyLink[];
+}
+
+export interface ProductHealthHistoryBucket {
+  bucketStart: string;
+  bucketMinutes: number;
+  minHealth: number;
+  maxHealth: number;
+  worstSeverity: Severity;
+}
+
 export interface ProductHealth {
   id: string;
   name: string;
@@ -278,12 +315,38 @@ export interface ProductHealth {
   activeEventCount: number;
   ciIds: string[];
   tags: string[];
+  healthPercent?: number;
+  damagePercent?: number;
+  components?: ComponentHealth[];
 }
 
 export interface ProductHealthDetail extends ProductHealth {
   configurationItems?: ConfigurationItem[];
   activeEvents?: Event[];
   severityBreakdown?: Record<string, number>;
+  sankey?: SankeyGraph | null;
+  calculatedAt?: string;
+  minHealthToday?: number;
+  maxHealthToday?: number;
+}
+
+export interface ProductComponentAdmin {
+  id: string;
+  code: string;
+  name: string;
+  weight: number;
+  influenceType: ComponentInfluenceType | string;
+  criticalThreshold: number;
+  ciIds: string[];
+}
+
+export interface ProductComponentPatch {
+  code: string;
+  name: string;
+  weight?: number;
+  influenceType?: ComponentInfluenceType | string;
+  criticalThreshold?: number;
+  ciIds?: string[];
 }
 
 export interface ProductAdmin {
@@ -294,6 +357,7 @@ export interface ProductAdmin {
   site: string;
   tags: string[];
   ciIds: string[];
+  components?: ProductComponentAdmin[];
 }
 
 export interface ProductCreateRequest {
@@ -312,6 +376,7 @@ export interface ProductPatchRequest {
   site?: string;
   tags?: string[];
   ciIds?: string[];
+  components?: ProductComponentPatch[];
 }
 
 export interface ConfigurationItem {

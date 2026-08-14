@@ -6,6 +6,7 @@ import com.wisla.fm.adapter.ingest.domain.SourceConfig;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -31,6 +32,11 @@ public class SourceConfigPersistenceAdapter implements SourceConfigLookupPort, S
     @Override
     public Optional<SourceConfig> findBySourceId(UUID sourceId) {
         return repository.findById(sourceId).map(mapper::toDomain);
+    }
+
+    @Override
+    public List<SourceConfig> findAll() {
+        return repository.findAll().stream().map(mapper::toDomain).toList();
     }
 
     @Override

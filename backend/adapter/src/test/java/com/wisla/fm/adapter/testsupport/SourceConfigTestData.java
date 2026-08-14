@@ -58,6 +58,9 @@ public final class SourceConfigTestData {
             set(entity, "ttlExpiresAt", ttlExpiresAt);
             set(entity, "createdAt", createdAt);
             set(entity, "updatedAt", updatedAt);
+            set(entity, "sourceType", "push_rest");
+            set(entity, "schedule", null);
+            set(entity, "parserConfig", Map.of());
             return entity;
         } catch (ReflectiveOperationException ex) {
             throw new IllegalStateException("Failed to build source config snapshot", ex);

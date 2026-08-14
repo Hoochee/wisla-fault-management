@@ -13,8 +13,8 @@
 |-------|----------|------------------|------|-----|
 | `/login` | Вход | Аутентификация (локальная / AD); редирект на Dashboard после успеха | Все (неавторизованные) | да |
 | `/` | Dashboard | Сводный экран: виджеты активных событий по критичности, быстрые фильтры (≤3 клика до консоли), ссылки на «Здоровье продуктов» и консоль; мини-тепловая карта или превью продуктов | Дежурный, Специалист, Администратор | да |
-| `/health` | Здоровье продуктов | Тепловая карта продуктов/систем по степени деградации (цвет × интенсивность); легенда severity; drill-down в карточку продукта; фильтр по тенанту/площадке/тегу; **Администратор:** «+ Продукт», редактирование/удаление ячейки | Дежурный, Специалист, Администратор | да |
-| `/health/:productId` | Карточка продукта | Состояние продукта, связанные КЕ, активные события, переход в консоль с предфильтром по продукту; **Администратор:** блок «Состав продукта» — добавление/отвязка КЕ | Дежурный, Специалист, Администратор | да |
+| `/health` | Здоровье продуктов | Тепловая карта по серверному `healthPercent` (цвет) и `damagePercent` (интенсивность); легенда; drill-down; фильтр по тенанту/площадке/тегу; **Администратор:** «+ Продукт», редактирование/удаление ячейки | Дежурный, Специалист, Администратор | да |
+| `/health/:productId` | Карточка продукта | Серверный снимок: percents, компоненты, Sankey (`d3-sankey`), heatmap истории, связанные КЕ, активные события; **Администратор:** состав КЕ + редактор весов слотов (`PATCH components`) | Дежурный, Специалист, Администратор | да |
 | `/events/raw` | Первичные события | Аналог Monq «События и логи»: сырые/нормализованные до дедупа; таблица/список; конструктор запросов; гистограмма; карты; привязка к потоку/источнику | Дежурный, Специалист, Администратор | да |
 | `/console` | Консоль событий | Обработанные события FM (после дедуп/правил); карты; конструктор; нижняя панель; polling | Дежурный, Специалист, Администратор | да |
 | `/console/:eventId` | Карточка события (полноэкранная) | Полные атрибуты (таблица + JSON); журнал действий; связи root/child; repeat_count; ITSM; действия на лету | Дежурный, Специалист, Администратор | да |
@@ -114,11 +114,13 @@
 
 ### Здоровье продуктов (`/health`)
 
-**Визуал:** тепловая карта (grid или иерархия продуктов); цвет ячейки = max severity активных событий; интенсивность = количество/вес.
+**Визуал:** тепловая карта (grid или иерархия продуктов). Цвет ячейки = серверный `healthPercent` из `GET /api/v1/health/products` (не клиентский синтез и не только `maxSeverity`); интенсивность = `damagePercent`. SPA не строит выдуманные компоненты CPU/HDD и не генерирует synthetic timeline.
 
-**Интеракция:** hover — tooltip (продукт, счётчики); click — `/health/:productId`.
+**Интеракция:** hover — tooltip (продукт, `healthPercent`, `damagePercent`, счётчики); click — `/health/:productId`.
 
-> **Дельта health-product-crud:** CRUD продуктов на панели здоровья; привязка КЕ со стороны продукта (вариант B — поле `ciIds` в create/patch заменяет все строки `product_ci`). Write — **только Администратор** (`POST/PATCH/DELETE /api/v1/admin/products`); чтение тепловой карты — `GET /api/v1/health/products` без изменений.
+> **Дельта product-health-graph:** список отдаёт additive `healthPercent`, `damagePercent`, `components[]`; поля `maxSeverity`, `activeEventCount`, `ciIds` сохраняются. CRUD продуктов без изменений (вариант B — `ciIds`).
+
+> **Дельта health-product-crud:** CRUD продуктов на панели здоровья; привязка КЕ со стороны продукта (вариант B — поле `ciIds` в create/patch заменяет все строки `product_ci`). Write — **только Администратор** (`POST/PATCH/DELETE /api/v1/admin/products`); чтение тепловой карты — `GET /api/v1/health/products`.
 
 **Toolbar (только Администратор):**
 - Кнопка **«+ Продукт»** → модальная форма создания.
@@ -133,7 +135,7 @@
 - **Тенант** (`tenant`), **Площадка** (`site`) — обязательно.
 - **Теги** (`tags`) — необязательно; в UI ввод через запятую, в API массив строк.
 - **КЕ** (`ciIds`) — необязательно; multiselect из `GET /api/v1/admin/configuration-items` (поиск по FQDN); при create/patch с `ciIds` — полная замена связей M:N для продукта.
-- **Не в форме (read-only):** `maxSeverity`, `activeEventCount` — вычисляются из активных событий связанных КЕ; отображаются на ячейке и карточке после сохранения.
+- **Не в форме (read-only):** `healthPercent`, `damagePercent`, `maxSeverity`, `activeEventCount` — с серверного снимка; отображаются на ячейке и карточке после сохранения.
 - **Создать** → `POST /api/v1/admin/products` с `{ name, code, tenant, site, tags?, ciIds? }` → **201**; закрытие модалки, reload тепловой карты (`GET /api/v1/health/products`).
 - **Сохранить** (edit) → `PATCH /api/v1/admin/products/{id}` с любым подмножеством полей; omit `ciIds` на patch → связи КЕ не меняются.
 - Не-администратор: кнопки и модалка скрыты; API write → **403**.
@@ -145,9 +147,19 @@
 
 ### Карточка продукта (`/health/:productId`)
 
-> **Дельта health-product-crud:** блок **«Состав продукта»** — список связанных КЕ, добавление и отвязка через `PATCH` с `ciIds` (полная замена списка).
+> **Дельта product-health-graph:** карточка рисует только серверные данные (`GET /api/v1/health/products/{id}` и `.../history`). Sankey — `sankey.nodes` / `sankey.links[{from,to,damage}]` через **d3-sankey** (узкий Angular wrapper). Heatmap истории — бакеты `minHealth` / `maxHealth` / `worstSeverity` (default `bucketMinutes=15`). `health-profile.util.ts` — только цвета/labels.
 
-**Шапка:** название, `code`, тенант, площадка, теги; badge `maxSeverity`; счётчик `activeEventCount`; ссылка **В консоль** с предфильтром по продукту (все роли с R).
+> **Дельта health-product-crud:** блок **«Состав продукта»** — список связанных КЕ, добавление и отвязка через `PATCH` с `ciIds` (полная замена списка). Новые КЕ без слота попадают в `COMMON`.
+
+**Шапка:** название, `code`, тенант, площадка, теги; badge `maxSeverity`; `healthPercent` / `damagePercent`; счётчик `activeEventCount`; min/max за сегодня; ссылка **В консоль** с предфильтром по продукту (все роли с R).
+
+**Компоненты и урон:** список слотов из snapshot (`code`, `name`, `healthPercent`, `damagePercent`); не выдумывать CPU/HDD на клиенте.
+
+**Sankey:** диаграмма урона продукт ← компоненты ← КЕ/сигналы; ширина ребра = `damage` с сервера.
+
+**Heatmap истории:** `GET /api/v1/health/products/{id}/history?from&to&bucketMinutes=` (default 15 мин); ячейка — худший статус в бакете (`worstSeverity`) и диапазон `minHealth`–`maxHealth`.
+
+**Редактор весов (только Администратор):** на карточке — вес слота, `influenceType` (`weighted` / `critical`), порог, состав КЕ слота; **Сохранить** → `PATCH /api/v1/admin/products/{id}` с `{ "components": [{ code, name, weight, influenceType, criticalThreshold, ciIds }] }`. Omit `components` на других PATCH не трогает слоты. Все веса 0 → API **400**. Одна КЕ в двух слотах одного продукта → **400**. Дежурный / Специалист видят веса read-only (без save).
 
 **Блок «Состав продукта»:**
 - **Все роли (R):** таблица связанных КЕ — FQDN, тип (`ciType`), система, подсистема.
@@ -328,10 +340,11 @@
 | GET/POST | `/api/v1/admin/users` | Пользователи |
 | GET/POST | `/api/v1/admin/roles` | Роли |
 | GET | `/api/v1/console/maps` | Карты событий (сохранённые фильтры) |
-| GET | `/api/v1/health/products` | Данные тепловой карты |
-| GET | `/api/v1/health/products/:id` | Карточка продукта (агрегаты read-only) |
-| POST | `/api/v1/admin/products` | Создание продукта; optional `ciIds` — привязка КЕ (только Администратор) |
-| PATCH | `/api/v1/admin/products/:id` | Обновление атрибутов; `ciIds` — полная замена `product_ci` (только Администратор) |
+| GET | `/api/v1/health/products` | Тепловая карта: `healthPercent`, `damagePercent`, `components[]`; `maxSeverity`, `activeEventCount`, `ciIds` сохраняются |
+| GET | `/api/v1/health/products/:id` | Карточка: snapshot, компоненты, `sankey`, min/max today, КЕ |
+| GET | `/api/v1/health/products/:id/history` | Бакеты heatmap (`from`, `to`, `bucketMinutes`, default 15) |
+| POST | `/api/v1/admin/products` | Создание продукта; optional `ciIds` — привязка КЕ + bind в COMMON (только Администратор) |
+| PATCH | `/api/v1/admin/products/:id` | Обновление атрибутов; `ciIds` — полная замена `product_ci`; optional `components` — слоты здоровья (только Администратор) |
 | DELETE | `/api/v1/admin/products/:id` | Удаление; **409** если есть связанные КЕ (только Администратор) |
 
 ---

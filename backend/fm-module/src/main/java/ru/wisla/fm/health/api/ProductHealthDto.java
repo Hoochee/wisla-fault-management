@@ -1,7 +1,6 @@
 package ru.wisla.fm.health.api;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 public record ProductHealthDto(
@@ -12,6 +11,9 @@ public record ProductHealthDto(
         String maxSeverity,
         int activeEventCount,
         List<UUID> ciIds,
-        List<String> tags
+        List<String> tags,
+        int healthPercent,
+        int damagePercent,
+        List<ComponentHealthDto> components
 ) {
 }

@@ -119,6 +119,53 @@ class SyncSourceConfigServiceTest {
         assertThat(stored.updatedAt()).isEqualTo(NOW.plusSeconds(TTL_SECONDS));
     }
 
+    @Test
+    void pullEtlFieldsAreCopiedOntoTheSnapshot() {
+        Map<String, Object> parserConfig = Map.of(
+                "targets", List.of(Map.of("url", "http://giftshop-catalog:8092/metrics", "ciFqdn", "giftshop-catalog.demo")),
+                "rules", List.of(Map.of("metric", "up", "invert", true))
+        );
+        fmModule.returning(List.of(new RemoteSourceConfig(
+                SOURCE_ID,
+                "giftshop-metrics",
+                "stored-hash",
+                "active",
+                Map.of(),
+                "pull_etl",
+                "30s",
+                parserConfig
+        )));
+
+        service.sync();
+
+        SourceConfig stored = sourceConfigs.all().getFirst();
+        assertThat(stored.type()).isEqualTo("pull_etl");
+        assertThat(stored.schedule()).isEqualTo("30s");
+        assertThat(stored.parserConfig()).isEqualTo(parserConfig);
+        assertThat(stored.sourceKey()).isEqualTo("giftshop-metrics");
+    }
+
+    @Test
+    void parserConfigChangeIsPickedUpOnResync() {
+        fmModule.returning(List.of(new RemoteSourceConfig(
+                SOURCE_ID, "giftshop-metrics", "stored-hash", "active", Map.of(),
+                "pull_etl", "30s", Map.of("rules", List.of(Map.of("metric", "up")))
+        )));
+        service.sync();
+
+        Map<String, Object> updated = Map.of("rules", List.of(Map.of(
+                "metric", "process_cpu_usage",
+                "thresholds", Map.of("critical", 0.95)
+        )));
+        fmModule.returning(List.of(new RemoteSourceConfig(
+                SOURCE_ID, "giftshop-metrics", "stored-hash", "active", Map.of(),
+                "pull_etl", "30s", updated
+        )));
+        service.sync();
+
+        assertThat(sourceConfigs.all().getFirst().parserConfig()).isEqualTo(updated);
+    }
+
     private static RemoteSourceConfig remote(String status, Map<String, Object> filterRules) {
         return remote(SOURCE_ID, "zabbix-prod-01", status, filterRules);
     }

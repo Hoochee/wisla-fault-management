@@ -46,7 +46,7 @@ import { AuthService } from '../../core/auth/auth.service';
       .login-card {
         width: 100%;
         max-width: 400px;
-        background: var(--bg-sidebar);
+        background: var(--bg-card);
         border: 1px solid var(--border);
         border-radius: 8px;
         padding: 2rem;
@@ -68,15 +68,15 @@ import { AuthService } from '../../core/auth/auth.service';
         font-size: 1.25rem;
         margin-bottom: 0.75rem;
       }
-      h1 { margin: 0; color: #fff; font-size: 1.5rem; }
+      h1 { margin: 0; color: var(--text-primary); font-size: 1.5rem; }
       p { margin: 0.25rem 0 0; color: var(--text-muted); font-size: 0.875rem; }
       form { display: flex; flex-direction: column; gap: 1rem; }
       label { display: flex; flex-direction: column; gap: 0.375rem; font-size: 0.8125rem; color: var(--text-secondary); }
       input {
         padding: 0.625rem 0.75rem;
-        border-radius: 6px;
+        border-radius: 8px;
         border: 1px solid var(--border);
-        background: var(--bg-primary);
+        background: var(--bg-card);
         color: var(--text-primary);
       }
       input:focus { outline: none; border-color: var(--accent); }

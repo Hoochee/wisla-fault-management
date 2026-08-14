@@ -1,6 +1,8 @@
 package ru.wisla.fm.processing.adapter.out.persistence;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import ru.wisla.fm.processing.adapter.out.lifecycle.EventLifecyclePublisher;
 import ru.wisla.fm.processing.application.port.out.EventStorePort;
 import ru.wisla.fm.processing.domain.DedupKey;
 import ru.wisla.fm.processing.domain.Event;
@@ -24,15 +26,31 @@ public class EventPersistenceAdapter implements EventStorePort {
 
     private final EventJpaRepository eventJpaRepository;
     private final EventJpaMapper eventJpaMapper;
+    private final EventLifecyclePublisher lifecyclePublisher;
 
     public EventPersistenceAdapter(EventJpaRepository eventJpaRepository, EventJpaMapper eventJpaMapper) {
+        this(eventJpaRepository, eventJpaMapper, null);
+    }
+
+    @Autowired
+    public EventPersistenceAdapter(
+            EventJpaRepository eventJpaRepository,
+            EventJpaMapper eventJpaMapper,
+            EventLifecyclePublisher lifecyclePublisher
+    ) {
         this.eventJpaRepository = eventJpaRepository;
         this.eventJpaMapper = eventJpaMapper;
+        this.lifecyclePublisher = lifecyclePublisher;
     }
 
     @Override
     public Event save(Event event) {
-        return eventJpaMapper.toDomain(eventJpaRepository.save(eventJpaMapper.toJpaEntity(event)));
+        boolean created = event.getId() == null;
+        Event saved = eventJpaMapper.toDomain(eventJpaRepository.save(eventJpaMapper.toJpaEntity(event)));
+        if (lifecyclePublisher != null) {
+            lifecyclePublisher.afterSave(created, saved);
+        }
+        return saved;
     }
 
     @Override

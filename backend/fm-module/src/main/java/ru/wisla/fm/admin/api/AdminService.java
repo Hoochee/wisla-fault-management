@@ -21,6 +21,9 @@ import ru.wisla.fm.cmdb.service.CmdbMapper;
 import ru.wisla.fm.common.api.NotFoundException;
 import ru.wisla.fm.common.api.PageMeta;
 import ru.wisla.fm.common.security.AuthorizationService;
+import ru.wisla.fm.health.application.port.in.UpdateProductComponentsUseCase;
+import ru.wisla.fm.health.domain.ComponentDraft;
+import ru.wisla.fm.health.domain.SavedComponent;
 import ru.wisla.fm.identity.api.AuthService;
 import ru.wisla.fm.identity.api.UserDto;
 import ru.wisla.fm.identity.domain.RoleEntity;
@@ -50,6 +53,7 @@ public class AdminService {
     private final PasswordEncoder passwordEncoder;
     private final CmdbMapper cmdbMapper;
     private final ObjectMapper objectMapper;
+    private final UpdateProductComponentsUseCase updateProductComponents;
 
     public AdminService(UserRepository userRepository,
                         RoleRepository roleRepository,
@@ -61,7 +65,8 @@ public class AdminService {
                         AuthorizationService authorizationService,
                         PasswordEncoder passwordEncoder,
                         CmdbMapper cmdbMapper,
-                        ObjectMapper objectMapper) {
+                        ObjectMapper objectMapper,
+                        UpdateProductComponentsUseCase updateProductComponents) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.configurationItemRepository = configurationItemRepository;
@@ -73,6 +78,7 @@ public class AdminService {
         this.passwordEncoder = passwordEncoder;
         this.cmdbMapper = cmdbMapper;
         this.objectMapper = objectMapper;
+        this.updateProductComponents = updateProductComponents;
     }
 
     public UserPage listUsers(Boolean active, String search, int page, int size) {
@@ -320,6 +326,7 @@ public class AdminService {
         productRepository.save(product);
         if (request.ciIds() != null) {
             linkCisToProduct(product.getId(), request.ciIds());
+            updateProductComponents.bindNewCisToCommon(product.getId(), request.ciIds());
         }
         return toProductAdminDto(product);
     }
@@ -349,6 +356,10 @@ public class AdminService {
         productRepository.save(product);
         if (patch.ciIds() != null) {
             linkCisToProduct(id, patch.ciIds());
+            updateProductComponents.bindNewCisToCommon(id, patch.ciIds());
+        }
+        if (patch.components() != null) {
+            updateProductComponents.update(id, toComponentDrafts(patch.components()));
         }
         return toProductAdminDto(product);
     }
@@ -395,8 +406,40 @@ public class AdminService {
                 product.getTenant(),
                 product.getSite(),
                 parseStringList(product.getTags()),
-                productCiRepository.findCiIdsByProductId(product.getId())
+                productCiRepository.findCiIdsByProductId(product.getId()),
+                toComponentAdminDtos(updateProductComponents.list(product.getId()))
         );
+    }
+
+    private static List<ComponentDraft> toComponentDrafts(List<ProductComponentPatch> components) {
+        List<ComponentDraft> drafts = new ArrayList<>();
+        int order = 0;
+        for (ProductComponentPatch component : components) {
+            drafts.add(new ComponentDraft(
+                    component.code(),
+                    component.name(),
+                    component.weight() == null ? 0 : component.weight(),
+                    component.influenceType(),
+                    component.criticalThreshold(),
+                    component.ciIds(),
+                    order++
+            ));
+        }
+        return drafts;
+    }
+
+    private static List<ProductComponentAdminDto> toComponentAdminDtos(List<SavedComponent> components) {
+        return components.stream()
+                .map(c -> new ProductComponentAdminDto(
+                        c.id(),
+                        c.code(),
+                        c.name(),
+                        c.weight(),
+                        c.influenceType(),
+                        c.criticalThreshold(),
+                        c.ciIds()
+                ))
+                .toList();
     }
 
     private ProductEntity findProductOrThrow(UUID id) {

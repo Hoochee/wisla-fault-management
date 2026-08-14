@@ -36,7 +36,7 @@ const SEVERITY_LABELS: Record<Severity, string> = {
     `
       .compact { display: inline-flex; align-items: center; gap: 0.375rem; }
       .dot { width: 8px; height: 8px; border-radius: 50%; }
-      .label { font-size: 0.75rem; color: #d1d5db; }
+      .label { font-size: 0.75rem; color: var(--text-primary); }
       .badge {
         display: inline-block;
         padding: 2px 8px;

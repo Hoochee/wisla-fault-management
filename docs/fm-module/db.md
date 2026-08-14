@@ -32,7 +32,11 @@ event_sources ──┬── raw_events
                 └── events
 
 configuration_items ──┬── product_ci ── products
+                      ├── product_component_ci ── product_component ── products
                       └── events (ci_id, denormalized snapshots)
+
+products ──┬── product_health_snapshot (1:1 current %)
+           └── product_health_history (heatmap buckets)
 
 events ──┬── event_action_logs
          └── events (root_event_id self-ref)
@@ -153,7 +157,7 @@ CMDB aggregate root.
 
 ### `products`
 
-Product health read-model root (denormalized counters updated by processing/health contexts).
+Product health read-model root (denormalized counters copied from `product_health_snapshot` on each recalculation; columns are not deleted).
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -185,6 +189,82 @@ M:N products ↔ configuration_items.
 | created_at | TIMESTAMPTZ | NOT NULL DEFAULT NOW() | |
 
 **Indexes:** `idx_product_ci_ci_id`
+
+---
+
+### `product_component`
+
+Health slot on a product instance (POWER / CPU / HDD / AVAILABILITY / COMMON). Owned by the health bounded context; CMDB still owns `products` / `product_ci`. Liquibase `013-product-health.sql`.
+
+On product create, if no slots exist, a `COMMON` row is inserted (`weight=100`, `influence_type=weighted`). Existing products are backfilled the same way.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK DEFAULT gen_random_uuid() | |
+| product_id | UUID | NOT NULL, FK → products(id) ON DELETE CASCADE | |
+| code | VARCHAR(32) | NOT NULL | Slot code, unique per product |
+| name | VARCHAR(128) | NOT NULL | Display name |
+| weight | INT | NOT NULL CHECK (weight BETWEEN 0 AND 100) | Share of `h_ratio` |
+| influence_type | VARCHAR(16) | NOT NULL | `weighted`, `critical` |
+| critical_threshold | INT | NOT NULL DEFAULT 100 | Used when `influence_type=critical` |
+| sort_order | INT | NOT NULL DEFAULT 0 | UI order |
+| created_at | TIMESTAMPTZ | NOT NULL DEFAULT NOW() | |
+| updated_at | TIMESTAMPTZ | NOT NULL DEFAULT NOW() | |
+
+**CHECK:** `influence_type IN ('weighted','critical')`  
+**UNIQUE:** `(product_id, code)`  
+**Indexes:** `idx_product_component_product_id`
+
+---
+
+### `product_component_ci`
+
+Which CIs influence a product component. A CI of a given product MUST belong to at most one `product_component` of that product (service invariant; PATCH returns 400 on duplicate). `weight` NULL → inherit the component weight.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| component_id | UUID | PK, FK → product_component(id) ON DELETE CASCADE | |
+| ci_id | UUID | PK, FK → configuration_items(id) ON DELETE CASCADE | |
+| weight | INT | CHECK (weight IS NULL OR weight BETWEEN 0 AND 100) | Optional per-CI override |
+
+**Indexes:** `idx_product_component_ci_ci_id`
+
+**Note:** Distinct from `product_ci` (product membership). PATCH `ciIds` still replaces `product_ci`; newly added CIs without a slot are bound to `COMMON`.
+
+---
+
+### `product_health_snapshot`
+
+Current server-side health read-model (one row per product). Source of `GET /api/v1/health/products` and detail percents / Sankey. After recalculation, `max_severity` and `active_event_count` are copied onto `products`.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| product_id | UUID | PK, FK → products(id) ON DELETE CASCADE | |
+| health_percent | INT | NOT NULL | Product `H` 0–100 |
+| damage_percent | INT | NOT NULL | Aggregate damage |
+| max_severity | VARCHAR(16) | NOT NULL | Worst open severity on linked CIs |
+| active_event_count | INT | NOT NULL | Open events on linked CIs |
+| payload | JSONB | NOT NULL DEFAULT '{}' | `components`, `signals`, `sankey` (`nodes`, `links[{from,to,damage}]`) |
+| calculated_at | TIMESTAMPTZ | NOT NULL | Last recalculation |
+
+---
+
+### `product_health_history`
+
+Heatmap buckets. Upsert on `(product_id, bucket_start)`; default bucket 15 minutes. Worst status in the cell is `worst_severity`.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK DEFAULT gen_random_uuid() | |
+| product_id | UUID | NOT NULL, FK → products(id) ON DELETE CASCADE | |
+| bucket_start | TIMESTAMPTZ | NOT NULL | Floored bucket instant |
+| bucket_minutes | INT | NOT NULL | Bucket size (default 15) |
+| min_health | INT | NOT NULL | Lowest `health_percent` in the bucket |
+| max_health | INT | NOT NULL | Highest `health_percent` in the bucket |
+| worst_severity | VARCHAR(16) | NOT NULL | Worst severity observed in the bucket |
+
+**UNIQUE:** `(product_id, bucket_start)`  
+**Indexes:** `idx_product_health_history_product_bucket` `(product_id, bucket_start)`
 
 ---
 
@@ -410,7 +490,7 @@ Optional read-model for CI health drill-down (`/health/ci/:ciId`). Rebuilt on `E
 
 **Indexes:** `idx_ci_health_snapshots_current_health`
 
-**Note:** Product-level aggregates (`max_severity`, `active_event_count`) live on `products` table; CI health can be computed on-the-fly from `events` in MVP if snapshots are not populated.
+**Note:** Product-level percents live in `product_health_snapshot` (copied onto `products.max_severity` / `active_event_count` on recalc). CI health can be computed on-the-fly from `events` in MVP if snapshots are not populated.
 
 ---
 
@@ -722,6 +802,7 @@ CREATE INDEX idx_configuration_items_tags ON configuration_items USING GIN (tags
 | `010_health.sql` | ci_health_snapshots |
 | `011_indexes.sql` | Console/query indexes (if not in table scripts) |
 | `012_seed_dev.sql` | Dev seed (optional, not prod) |
+| `013-product-health.sql` | `product_component`, `product_component_ci`, `product_health_snapshot`, `product_health_history`; COMMON backfill |
 
 ---
 
@@ -743,8 +824,14 @@ CREATE INDEX idx_configuration_items_tags ON configuration_items USING GIN (tags
 | `closedAt` | events.closed_at |
 | `itsmIncidentNumber` | events.itsm_incident_number |
 | `ciType` | configuration_items.ci_type |
-| `maxSeverity` | products.max_severity |
-| `activeEventCount` | products.active_event_count |
+| `maxSeverity` | products.max_severity (copied from `product_health_snapshot` on recalc) |
+| `activeEventCount` | products.active_event_count (copied from snapshot on recalc) |
+| `healthPercent` | product_health_snapshot.health_percent |
+| `damagePercent` | product_health_snapshot.damage_percent |
+| `sankey` | product_health_snapshot.payload.sankey |
+| `components` (health) | product_health_snapshot.payload.components / `product_component` |
+| `components` (admin PATCH) | product_component + product_component_ci |
+| `minHealth` / `maxHealth` / `worstSeverity` | product_health_history |
 | `approvalStatus` | processing_rules.approval_status |
 | `ruleType` | processing_rules.rule_type |
 | `lastSuccessAt` | event_sources.last_success_at |
@@ -757,7 +844,7 @@ CREATE INDEX idx_configuration_items_tags ON configuration_items USING GIN (tags
 
 | Field | Target | Notes |
 |-------|--------|-------|
-| `event_sources.id` | adapter `source_config_snapshots.source_id` | Logical UUID, polled via `GET /api/v1/internal/sources/{id}/config` |
+| `event_sources.id` | adapter `source_config_snapshots.source_id` | Logical UUID, polled via `GET /api/v1/internal/sources` (`type`, `schedule`, `parserConfig`) and `GET /api/v1/internal/sources/{id}/config` |
 | `events.id` | adapter buffered message ack | No FK |
 | `configuration_items.external_ids` | WISLA CMDB | post-MVP integration |
 
@@ -771,7 +858,8 @@ CREATE INDEX idx_configuration_items_tags ON configuration_items USING GIN (tags
 | Ingest batch | `raw_events` INSERT (+ optional `configuration_items` UPSERT) |
 | Event processing | `raw_events` UPDATE + `events` INSERT/UPDATE + `event_action_logs` |
 | Rule save | `processing_rules` UPDATE + `rule_versions` INSERT + version pointer |
-| Product health refresh | `products` UPDATE (+ optional `ci_health_snapshots` UPSERT) |
+| Product health refresh | `product_health_snapshot` UPSERT + `product_health_history` UPSERT + `products` UPDATE (`max_severity`, `active_event_count`) |
+| Product component PATCH | `product_component` REPLACE + `product_component_ci` + optional `product_ci` |
 
 ---
 

@@ -160,7 +160,7 @@ interface CiForm {
 
       .modal { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; width: min(28rem, 92vw); }
 
-      .modal h2 { margin: 0 0 1rem; font-size: 1rem; color: #fff; }
+      .modal h2 { margin: 0 0 1rem; font-size: 1rem; color: var(--text-primary); }
 
       label { display: block; margin-bottom: 0.75rem; font-size: 0.8125rem; color: var(--text-secondary); }
 

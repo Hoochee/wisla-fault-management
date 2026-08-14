@@ -16,6 +16,7 @@ Main coordinator for `/build-feature`. **Only agent that communicates with the u
 ## Inputs
 
 - User messages
+- Repo-root [`BACKLOG.md`](../BACKLOG.md) — when the user asks what to do next or to take a backlog item
 - `openspec/changes/<change>/.feature-state.json`
 - OpenSpec artifacts: `proposal.md`, `specs/`, `design.md`, `tasks.md`
 - Jira (via orchestrator reading chrome-devtools MCP)

@@ -36,6 +36,14 @@ Created by [bootstrap.md](bootstrap.md) at `openspec/changes/<changeName>/.featu
 
 `tests.frontend_e2e` tracks Playwright e2e separately from Vitest (`tests.frontend`) because they run against different prerequisites (e2e needs a live backend), but both are produced by the same `frontend_tests` phase / same subagent (11-frontend-test-engineer) and gate the **same** transition to `review`. `testFixIterations.frontend` is a shared budget covering fixes to either suite (see [Test fix loop](#test-fix-loop)).
 
+## Product backlog
+
+Deferred work lives in repo-root [`BACKLOG.md`](../BACKLOG.md).
+
+- User asks «что дальше» / «из беклога» / «следующую задачу» / `/build-feature` without a key — **read `BACKLOG.md`**, propose a `ready` item, do not invent a parallel epic.
+- Discovery may **add** parked/blocked items when the user defers work (e.g. extract health microservice). Do not implement backlog items inside an unrelated change.
+- After archiving a change, if follow-ups remain, keep them in `BACKLOG.md` (do not only mention them in chat).
+
 ## Phase transitions
 
 | From | Action | To | Gate |

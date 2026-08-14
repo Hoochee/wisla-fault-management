@@ -4,16 +4,18 @@ import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FmApiService } from '../../core/api/fm-api.service';
 import { AuthService } from '../../core/auth/auth.service';
-import { ConfigurationItem, Event, ProductHealth, ProductHealthDetail, Severity } from '../../core/api/api.models';
+import { ConfigurationItem, Event, ProductHealth, ProductHealthDetail, ProductHealthHistoryBucket, Severity } from '../../core/api/api.models';
 import { CiHealthProfile } from '../../core/health/health.models';
 import {
   buildProfiles,
   findWorstCi,
-  getHeatColor,
+  getHealthPercentColor,
+  percentToLevel,
   uniqueSites,
   uniqueTenants,
 } from '../../core/health/health-profile.util';
 import { CiSidebarComponent } from '../../shared/health/ci-sidebar.component';
+import { MonqHealthGraphComponent } from '../../shared/health/monq-health-graph.component';
 import { OperativeCenterPanelComponent } from '../../shared/health/operative-center-panel.component';
 import { SeverityBadgeComponent } from '../../shared/severity-badge/severity-badge.component';
 
@@ -29,7 +31,7 @@ interface ProductForm {
 @Component({
   selector: 'app-health',
   standalone: true,
-  imports: [RouterLink, FormsModule, CiSidebarComponent, OperativeCenterPanelComponent, SeverityBadgeComponent],
+  imports: [RouterLink, FormsModule, CiSidebarComponent, OperativeCenterPanelComponent, SeverityBadgeComponent, MonqHealthGraphComponent],
   templateUrl: './health-page.component.html',
   styleUrl: './health-page.component.scss',
 })
@@ -41,6 +43,8 @@ export class HealthPageComponent implements OnInit {
   filteredProducts: ProductHealth[] = [];
   selectedProductId = '';
   selectedCiId = '';
+  selectedDetail: ProductHealthDetail | null = null;
+  historyByProduct: Record<string, ProductHealthHistoryBucket[]> = {};
   ciList: ConfigurationItem[] = [];
   events: Event[] = [];
   profiles: Record<string, CiHealthProfile> = {};
@@ -49,8 +53,9 @@ export class HealthPageComponent implements OnInit {
   tenants: string[] = [];
   sites: string[] = [];
   readonly severities: Severity[] = ['fatal', 'critical', 'major', 'minor', 'warning', 'normal'];
-  readonly getHeatColor = getHeatColor;
   readonly isAdmin = this.auth.isAdmin;
+  readonly percentToLevel = percentToLevel;
+  readonly getHealthPercentColor = getHealthPercentColor;
 
   form: ProductForm = this.emptyForm();
   readonly modalOpen = signal(false);
@@ -71,6 +76,10 @@ export class HealthPageComponent implements OnInit {
 
   get selectedProduct(): ProductHealth | undefined {
     return this.products.find((p) => p.id === this.selectedProductId);
+  }
+
+  historyFor(productId: string): ProductHealthHistoryBucket[] {
+    return this.historyByProduct[productId] ?? [];
   }
 
   ngOnInit(): void {
@@ -95,6 +104,7 @@ export class HealthPageComponent implements OnInit {
   selectProduct(id: string): void {
     this.selectedProductId = id;
     this.api.getProduct(id).subscribe((detail) => this.applyDetail(detail));
+    this.loadHistory(id);
   }
 
   selectCi(id: string): void {
@@ -232,6 +242,7 @@ export class HealthPageComponent implements OnInit {
         this.selectProduct(this.filteredProducts[0].id);
       } else {
         this.selectedProductId = '';
+        this.selectedDetail = null;
         this.ciList = [];
         this.events = [];
         this.profiles = {};
@@ -259,11 +270,33 @@ export class HealthPageComponent implements OnInit {
   }
 
   private applyDetail(detail: ProductHealthDetail): void {
+    this.selectedDetail = detail;
     this.ciList = detail.configurationItems ?? [];
     this.events = detail.activeEvents ?? [];
     this.profiles = buildProfiles(this.ciList, this.events);
     const worst = findWorstCi(this.ciList, this.profiles);
     if (worst) this.selectedCiId = worst.id;
+  }
+
+  private loadHistory(productId: string): void {
+    if (this.historyByProduct[productId]?.length) return;
+    const to = new Date();
+    const from = new Date(to);
+    from.setHours(0, 0, 0, 0);
+    this.api
+      .getProductHistory(productId, {
+        from: from.toISOString(),
+        to: to.toISOString(),
+        bucketMinutes: 15,
+      })
+      .subscribe({
+        next: (buckets) => {
+          this.historyByProduct = { ...this.historyByProduct, [productId]: buckets };
+        },
+        error: () => {
+          this.historyByProduct = { ...this.historyByProduct, [productId]: [] };
+        },
+      });
   }
 
   private emptyForm(): ProductForm {

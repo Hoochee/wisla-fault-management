@@ -44,7 +44,7 @@ import { DashboardSummary } from '../../core/api/api.models';
   `,
   styles: [
     `
-      .title { margin: 0 0 1.5rem; font-size: 1.5rem; color: #fff; }
+      .title { margin: 0 0 1.5rem; font-size: 1.5rem; color: var(--text-primary); }
       .severity-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
       .severity-card { background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; text-decoration: none; text-align: center; }
       .severity-card:hover { border-color: var(--accent); }
@@ -53,16 +53,16 @@ import { DashboardSummary } from '../../core/api/api.models';
       .panels { display: grid; grid-template-columns: 1fr 2fr; gap: 1rem; }
       @media (max-width: 900px) { .panels { grid-template-columns: 1fr; } }
       .panel { background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
-      .panel h2 { margin: 0 0 0.75rem; font-size: 0.9375rem; color: #fff; }
+      .panel h2 { margin: 0 0 0.75rem; font-size: 0.9375rem; color: var(--text-primary); }
       .link { color: var(--accent); text-decoration: none; font-size: 0.875rem; }
       .map-item { display: block; padding: 0.5rem; color: var(--text-secondary); text-decoration: none; border-radius: 4px; font-size: 0.875rem; }
-      .map-item:hover { background: rgba(74,158,255,0.1); color: var(--accent); }
+      .map-item:hover { background: var(--nav-hover); color: var(--accent); }
       .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.5rem; }
       .product-cell { padding: 0.75rem; border-radius: 6px; text-decoration: none; border: 1px solid var(--border); }
       .product-cell[data-severity='critical'] { background: rgba(244,67,54,0.15); }
       .product-cell[data-severity='major'] { background: rgba(255,152,0,0.15); }
       .product-cell[data-severity='warning'] { background: rgba(255,235,59,0.1); }
-      .product-name { display: block; color: #fff; font-size: 0.8125rem; font-weight: 500; }
+      .product-name { display: block; color: var(--text-primary); font-size: 0.8125rem; font-weight: 500; }
       .product-count { font-size: 0.6875rem; color: var(--text-muted); }
       .total { margin-top: 1rem; color: var(--text-muted); font-size: 0.875rem; }
     `,

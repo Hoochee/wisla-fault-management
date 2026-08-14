@@ -17,7 +17,28 @@ public interface FmModuleSourceConfigPort {
             String sourceKey,
             String apiKeyHash,
             String status,
-            Map<String, Object> filterRules
+            Map<String, Object> filterRules,
+            String type,
+            String schedule,
+            Map<String, Object> parserConfig
     ) {
+        public RemoteSourceConfig {
+            if (type == null || type.isBlank()) {
+                type = "push_rest";
+            }
+            if (parserConfig == null) {
+                parserConfig = Map.of();
+            }
+        }
+
+        public RemoteSourceConfig(
+                UUID sourceId,
+                String sourceKey,
+                String apiKeyHash,
+                String status,
+                Map<String, Object> filterRules
+        ) {
+            this(sourceId, sourceKey, apiKeyHash, status, filterRules, "push_rest", null, Map.of());
+        }
     }
 }

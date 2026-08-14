@@ -265,7 +265,7 @@ const SIMULATOR_POLL_SEC = 12;
       .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
       @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
       .card { background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
-      .card h2 { margin: 0 0 0.75rem; font-size: 0.9375rem; color: #fff; }
+      .card h2 { margin: 0 0 0.75rem; font-size: 0.9375rem; color: var(--text-primary); }
       dl { margin: 0; display: grid; grid-template-columns: 140px 1fr; gap: 0.5rem; font-size: 0.8125rem; }
       dt { color: var(--text-muted); }
       dd { margin: 0; color: var(--text-secondary); }
@@ -307,7 +307,7 @@ const SIMULATOR_POLL_SEC = 12;
         background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px;
         padding: 1.25rem; width: min(28rem, 92vw);
       }
-      .modal h2 { margin: 0 0 0.75rem; font-size: 1rem; color: #fff; }
+      .modal h2 { margin: 0 0 0.75rem; font-size: 1rem; color: var(--text-primary); }
       .modal p { margin: 0 0 0.75rem; font-size: 0.8125rem; color: var(--text-secondary); }
       .warning { color: #ffc107 !important; }
       .hint { color: var(--text-muted) !important; }

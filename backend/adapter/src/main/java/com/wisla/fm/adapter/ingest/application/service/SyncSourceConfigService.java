@@ -60,7 +60,10 @@ public class SyncSourceConfigService implements SyncSourceConfigUseCase {
                 !ACTIVE_STATUS.equals(source.status()),
                 ttl,
                 now,
-                now
+                now,
+                source.type(),
+                source.schedule(),
+                source.parserConfig()
         );
     }
 }

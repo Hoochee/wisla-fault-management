@@ -70,26 +70,26 @@ import { PushToastService, PushToastView } from '../../core/notifications/push-t
         padding: 0.375rem 0.625rem;
         font-size: 0.6875rem;
         font-weight: 500;
-        color: #9ca3af;
-        background: rgba(37, 40, 48, 0.92);
-        border: 1px solid rgba(99, 102, 241, 0.25);
-        border-radius: 6px;
+        color: var(--text-secondary);
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
         cursor: pointer;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        box-shadow: 0 4px 12px rgba(28, 31, 38, 0.12);
       }
       .dismiss-all:hover {
-        color: #d1d5db;
-        border-color: rgba(99, 102, 241, 0.45);
-        background: rgba(37, 40, 48, 1);
+        color: var(--text-primary);
+        border-color: var(--accent);
+        background: var(--bg-card);
       }
       .toast {
         display: flex;
         align-items: stretch;
         width: 100%;
-        background: #252830;
-        border: 1px solid rgba(99, 102, 241, 0.45);
+        background: var(--bg-card);
+        border: 1px solid var(--border);
         border-radius: 8px;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+        box-shadow: 0 8px 24px rgba(28, 31, 38, 0.12);
         pointer-events: auto;
         overflow: hidden;
       }
@@ -110,32 +110,32 @@ import { PushToastService, PushToastView } from '../../core/notifications/push-t
       .toast-title {
         font-size: 0.8125rem;
         font-weight: 600;
-        color: #fff;
+        color: var(--text-primary);
         margin-bottom: 0.25rem;
       }
       .toast-message {
         font-size: 0.75rem;
-        color: #d1d5db;
+        color: var(--text-secondary);
         line-height: 1.35;
       }
       .toast-action {
         margin-top: 0.375rem;
         font-size: 0.6875rem;
-        color: #a5b4fc;
+        color: var(--accent);
       }
       .toast-close {
         flex-shrink: 0;
         width: 2rem;
         border: none;
         background: none;
-        color: #6b7280;
+        color: var(--text-muted);
         font-size: 1.125rem;
         line-height: 1;
         cursor: pointer;
       }
       .toast-close:hover {
-        color: #fff;
-        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-primary);
+        background: var(--nav-hover);
       }
     `,
   ],

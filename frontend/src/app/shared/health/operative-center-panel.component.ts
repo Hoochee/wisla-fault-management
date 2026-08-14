@@ -113,38 +113,38 @@ type Tab = 'signals' | 'health' | 'params' | 'events';
     `
       .panel { display: flex; flex-direction: column; height: 100%; min-height: 0; }
       .header { display: flex; justify-content: space-between; margin-bottom: 1rem; }
-      .subtitle { font-size: 0.75rem; color: #6b7280; }
-      .fqdn { margin: 0.125rem 0 0; font-size: 1.125rem; font-weight: 600; color: #fff; font-family: var(--font-mono); }
-      .meta { font-size: 0.75rem; color: #6b7280; margin-top: 0.125rem; }
-      .tabs { display: flex; border-bottom: 1px solid #3a3f4b; margin-bottom: 1rem; }
+      .subtitle { font-size: 0.75rem; color: var(--text-muted); }
+      .fqdn { margin: 0.125rem 0 0; font-size: 1.125rem; font-weight: 600; color: var(--text-primary); font-family: var(--font-mono); }
+      .meta { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.125rem; }
+      .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
       .tab {
         padding: 0.5rem 1rem; font-size: 0.875rem; background: none; border: none; border-bottom: 2px solid transparent;
-        margin-bottom: -1px; color: #6b7280; cursor: pointer;
+        margin-bottom: -1px; color: var(--text-muted); cursor: pointer;
       }
-      .tab:hover { color: #d1d5db; }
-      .tab.active { border-bottom-color: #4a9eff; color: #4a9eff; }
-      .badge-count { margin-left: 0.375rem; padding: 0 0.375rem; font-size: 10px; border-radius: 4px; background: #dc2626; color: #fff; }
+      .tab:hover { color: var(--text-primary); }
+      .tab.active { border-bottom-color: var(--accent); color: var(--accent); }
+      .badge-count { margin-left: 0.375rem; padding: 0 0.375rem; font-size: 10px; border-radius: 4px; background: var(--danger); color: #fff; }
       .content { flex: 1; overflow: auto; min-height: 0; }
-      .card { background: #252830; border: 1px solid #3a3f4b; border-radius: 8px; padding: 1rem; }
-      .card h3 { margin: 0 0 0.75rem; font-size: 0.875rem; color: #fff; font-weight: 500; }
+      .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+      .card h3 { margin: 0 0 0.75rem; font-size: 0.875rem; color: var(--text-primary); font-weight: 500; }
       .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
       .card-head h3 { margin: 0; }
-      .muted { font-size: 0.875rem; color: #6b7280; }
+      .muted { font-size: 0.875rem; color: var(--text-muted); }
       .signal-list { display: flex; flex-direction: column; gap: 0.5rem; margin: 1rem 0; }
       .signal-row, .event-row {
-        display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px;
-        border: 1px solid #3a3f4b; text-decoration: none; font-size: 0.875rem;
+        display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-radius: 8px;
+        border: 1px solid var(--border); text-decoration: none; font-size: 0.875rem;
       }
-      .signal-row:hover, .event-row:hover { background: rgba(58, 63, 75, 0.3); }
-      .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #d1d5db; }
-      .time { font-size: 0.75rem; color: #6b7280; }
-      .link { font-size: 0.75rem; color: #4a9eff; text-decoration: none; }
+      .signal-row:hover, .event-row:hover { background: var(--nav-hover); }
+      .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); }
+      .time { font-size: 0.75rem; color: var(--text-muted); }
+      .link { font-size: 0.75rem; color: var(--accent); text-decoration: none; }
       .link:hover { text-decoration: underline; }
       .params { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; font-size: 0.875rem; }
-      .params dt { font-size: 0.75rem; color: #6b7280; }
-      .params dd { margin: 0.125rem 0 0; color: #d1d5db; }
+      .params dt { font-size: 0.75rem; color: var(--text-muted); }
+      .params dd { margin: 0.125rem 0 0; color: var(--text-primary); }
       .tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 1rem; }
-      .tag { padding: 0.125rem 0.5rem; font-size: 0.75rem; border-radius: 4px; background: rgba(58, 63, 75, 0.5); color: #9ca3af; }
+      .tag { padding: 0.125rem 0.5rem; font-size: 0.75rem; border-radius: 4px; background: var(--bg-primary); color: var(--text-secondary); }
     `,
   ],
 })

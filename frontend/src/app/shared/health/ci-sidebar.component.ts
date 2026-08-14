@@ -29,17 +29,17 @@ import { HealthBadgeComponent } from './health-badge.component';
   `,
   styles: [
     `
-      .sidebar { width: 14rem; flex-shrink: 0; border-right: 1px solid #3a3f4b; padding-right: 1rem; }
-      .product-name { font-size: 0.75rem; color: #6b7280; margin-bottom: 0.5rem; }
+      .sidebar { width: 14rem; flex-shrink: 0; border-right: 1px solid var(--border); padding-right: 1rem; }
+      .product-name { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem; }
       .list { display: flex; flex-direction: column; gap: 0.25rem; }
       .ci-btn {
-        width: 100%; text-align: left; padding: 0.5rem; border-radius: 6px; border: 1px solid transparent;
+        width: 100%; text-align: left; padding: 0.5rem; border-radius: 8px; border: 1px solid transparent;
         background: transparent; cursor: pointer; transition: background 0.15s, border-color 0.15s;
       }
-      .ci-btn:hover { background: rgba(58, 63, 75, 0.3); }
-      .ci-btn.selected { background: rgba(74, 158, 255, 0.15); border-color: rgba(74, 158, 255, 0.4); }
-      .fqdn { font-family: var(--font-mono); font-size: 0.75rem; color: #d1d5db; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .ci-btn.selected .fqdn { color: #fff; }
+      .ci-btn:hover { background: var(--nav-hover); }
+      .ci-btn.selected { background: var(--nav-hover); border-color: rgba(47, 111, 237, 0.35); }
+      .fqdn { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .ci-btn.selected .fqdn { color: var(--text-primary); }
     `,
   ],
 })

@@ -97,7 +97,7 @@ interface CredentialsData {
         background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px;
         padding: 1.25rem; width: min(32rem, 92vw); display: flex; flex-direction: column; gap: 0.75rem;
       }
-      .modal h2 { margin: 0; font-size: 1rem; color: #fff; }
+      .modal h2 { margin: 0; font-size: 1rem; color: var(--text-primary); }
       .warning { margin: 0; font-size: 0.8125rem; color: #ffc107; }
       .copy-row { display: flex; gap: 0.5rem; }
       .copy-row input { flex: 1; font-family: var(--font-mono); font-size: 0.75rem; }

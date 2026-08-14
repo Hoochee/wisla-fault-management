@@ -28,7 +28,9 @@ class ProductHealthControllerTest extends AbstractFmModuleTest {
         .andExpect(jsonPath("$[0].name").exists())
         .andExpect(jsonPath("$[0].maxSeverity").exists())
         .andExpect(jsonPath("$[0].activeEventCount").isNumber())
-        .andExpect(jsonPath("$[0].ciIds").isArray());
+        .andExpect(jsonPath("$[0].ciIds").isArray())
+        .andExpect(jsonPath("$[0].healthPercent").isNumber())
+        .andExpect(jsonPath("$[0].damagePercent").isNumber());
   }
 
   @Test
@@ -63,7 +65,10 @@ class ProductHealthControllerTest extends AbstractFmModuleTest {
         .andExpect(jsonPath("$.id").value(productId))
         .andExpect(jsonPath("$.configurationItems").isArray())
         .andExpect(jsonPath("$.activeEvents").isArray())
-        .andExpect(jsonPath("$.severityBreakdown").exists());
+        .andExpect(jsonPath("$.severityBreakdown").exists())
+        .andExpect(jsonPath("$.healthPercent").isNumber())
+        .andExpect(jsonPath("$.damagePercent").isNumber())
+        .andExpect(jsonPath("$.sankey").exists());
   }
 
   @Test
@@ -75,5 +80,32 @@ class ProductHealthControllerTest extends AbstractFmModuleTest {
                 .header("Authorization", bearer(token)))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.error").value("not_found"));
+  }
+
+  @Test
+  void historyWithoutAuthReturns401() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/health/products/00000000-0000-0000-0000-000000000001/history"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void historyReturnsBuckets() throws Exception {
+    String token = obtainAdminToken();
+    MvcResult list =
+        mockMvc
+            .perform(get("/api/v1/health/products").header("Authorization", bearer(token)))
+            .andExpect(status().isOk())
+            .andReturn();
+    String productId =
+        objectMapper.readTree(list.getResponse().getContentAsString()).get(0).get("id").asText();
+
+    mockMvc
+        .perform(
+            get("/api/v1/health/products/" + productId + "/history")
+                .param("bucketMinutes", "15")
+                .header("Authorization", bearer(token)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$").isArray());
   }
 }

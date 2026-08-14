@@ -20,7 +20,10 @@ public class SourceConfigJpaMapper {
                 entity.isBlocked(),
                 entity.getTtlExpiresAt(),
                 entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                entity.getUpdatedAt(),
+                entity.getSourceType(),
+                entity.getSchedule(),
+                entity.getParserConfig()
         );
     }
 
@@ -37,7 +40,10 @@ public class SourceConfigJpaMapper {
                 config.filterRules().asMap(),
                 config.blocked(),
                 config.ttlExpiresAt(),
-                config.updatedAt()
+                config.updatedAt(),
+                config.type(),
+                config.schedule(),
+                config.parserConfig()
         );
     }
 }

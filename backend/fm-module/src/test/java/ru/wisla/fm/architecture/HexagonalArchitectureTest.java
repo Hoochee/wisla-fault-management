@@ -16,11 +16,10 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 
 /**
- * Enforces the ADR-001 dependency directions for the migrated contexts only. Ten bounded
- * contexts ({@code identity}, {@code console}, {@code dashboard}, {@code admin},
- * {@code settings}, {@code health}, {@code configuration}, {@code cmdb}, {@code rules},
- * {@code notifications}) deliberately keep the layered Spring/JPA structure, so every layering
- * rule is scoped by {@link #IN_SCOPE} instead of being applied module-wide. Only the
+ * Enforces the ADR-001 dependency directions for the migrated contexts. Bounded
+ * contexts other than {@code ingestion}, {@code processing}, and {@code health}
+ * keep the layered Spring/JPA structure, so every layering rule is scoped by
+ * {@link #IN_SCOPE} instead of being applied module-wide. Only the
  * service-independence rule is module-wide, and only the transport rules are narrower than
  * {@link #IN_SCOPE} — see {@link #TRANSPORT_IN_SCOPE}.
  */
@@ -28,7 +27,8 @@ class HexagonalArchitectureTest {
 
     private static final String[] IN_SCOPE = {
             "ru.wisla.fm.ingestion..",
-            "ru.wisla.fm.processing.."
+            "ru.wisla.fm.processing..",
+            "ru.wisla.fm.health.."
     };
 
     /**
@@ -36,11 +36,11 @@ class HexagonalArchitectureTest {
      * {@code @RestController} that design decision D7 deliberately leaves outside
      * {@code adapter/in}, together with the console services it reads. Widening the transport rules
      * to the processing context therefore requires moving that controller, which this change does
-     * not do — so they stay scoped to the one context where the rule already holds, rather than
-     * being suppressed for a class that is expected to move later.
+     * not do — so they stay scoped to the contexts where the rule already holds.
      */
     private static final String[] TRANSPORT_IN_SCOPE = {
-            "ru.wisla.fm.ingestion.."
+            "ru.wisla.fm.ingestion..",
+            "ru.wisla.fm.health.."
     };
 
     private static final String[] FRAMEWORK_PACKAGES = {
@@ -182,6 +182,21 @@ class HexagonalArchitectureTest {
                 .layer("Application").definedBy("ru.wisla.fm.processing.application..")
                 .layer("Adapter").definedBy("ru.wisla.fm.processing.adapter..")
                 .layer("Infrastructure").definedBy("ru.wisla.fm.processing.infrastructure..")
+                .whereLayer("Domain").mayOnlyBeAccessedByLayers("Application", "Adapter", "Infrastructure")
+                .whereLayer("Application").mayOnlyBeAccessedByLayers("Adapter", "Infrastructure")
+                .whereLayer("Adapter").mayOnlyBeAccessedByLayers("Infrastructure")
+                .whereLayer("Infrastructure").mayOnlyBeAccessedByLayers("Adapter")
+                .check(PRODUCTION_CLASSES);
+    }
+
+    @Test
+    void healthLayersOnlyDependInwards() {
+        layeredArchitecture()
+                .consideringOnlyDependenciesInLayers()
+                .layer("Domain").definedBy("ru.wisla.fm.health.domain..")
+                .layer("Application").definedBy("ru.wisla.fm.health.application..")
+                .layer("Adapter").definedBy("ru.wisla.fm.health.adapter..")
+                .layer("Infrastructure").definedBy("ru.wisla.fm.health.infrastructure..")
                 .whereLayer("Domain").mayOnlyBeAccessedByLayers("Application", "Adapter", "Infrastructure")
                 .whereLayer("Application").mayOnlyBeAccessedByLayers("Adapter", "Infrastructure")
                 .whereLayer("Adapter").mayOnlyBeAccessedByLayers("Infrastructure")

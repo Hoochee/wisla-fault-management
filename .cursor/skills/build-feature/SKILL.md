@@ -15,10 +15,11 @@ disable-model-invocation: true
 ## Instructions
 
 1. Load [build-feature/SKILL.core.md](../../build-feature/SKILL.core.md)
-2. If no `.feature-state.json` for the change — run [build-feature/bootstrap.md](../../build-feature/bootstrap.md)
-3. Load [build-feature/delegation/task-tool.md](../../build-feature/delegation/task-tool.md)
-4. Load [build-feature/orchestrator-playbook.md](../../build-feature/orchestrator-playbook.md)
-5. Agent prompts: [.agents/](../../.agents/)
+2. If the user asks for the next task / backlog item, or `/build-feature` has no key — read [`BACKLOG.md`](../../BACKLOG.md)
+3. If no `.feature-state.json` for the change — run [build-feature/bootstrap.md](../../build-feature/bootstrap.md)
+4. Load [build-feature/delegation/task-tool.md](../../build-feature/delegation/task-tool.md)
+5. Load [build-feature/orchestrator-playbook.md](../../build-feature/orchestrator-playbook.md)
+6. Agent prompts: [.agents/](../../.agents/)
 
 All paths relative to repository root.
 

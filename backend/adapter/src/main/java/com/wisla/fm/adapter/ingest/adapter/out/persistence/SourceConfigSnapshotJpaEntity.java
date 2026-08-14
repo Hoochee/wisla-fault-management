@@ -44,6 +44,16 @@ public class SourceConfigSnapshotJpaEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "source_type", nullable = false)
+    private String sourceType = "push_rest";
+
+    @Column(name = "schedule")
+    private String schedule;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "parser_config", nullable = false)
+    private Map<String, Object> parserConfig = Map.of();
+
     protected SourceConfigSnapshotJpaEntity() {
     }
 
@@ -87,6 +97,18 @@ public class SourceConfigSnapshotJpaEntity {
         return updatedAt;
     }
 
+    public String getSourceType() {
+        return sourceType;
+    }
+
+    public String getSchedule() {
+        return schedule;
+    }
+
+    public Map<String, Object> getParserConfig() {
+        return parserConfig;
+    }
+
     public boolean isExpired() {
         return ttlExpiresAt.isBefore(Instant.now());
     }
@@ -101,6 +123,23 @@ public class SourceConfigSnapshotJpaEntity {
             Instant ttlExpiresAt,
             Instant now
     ) {
+        replace(sourceId, sourceKey, apiKeyHash, endpoint, filterRules, blocked, ttlExpiresAt, now,
+                "push_rest", null, Map.of());
+    }
+
+    public void replace(
+            UUID sourceId,
+            String sourceKey,
+            String apiKeyHash,
+            String endpoint,
+            Map<String, Object> filterRules,
+            boolean blocked,
+            Instant ttlExpiresAt,
+            Instant now,
+            String sourceType,
+            String schedule,
+            Map<String, Object> parserConfig
+    ) {
         this.sourceId = sourceId;
         this.sourceKey = sourceKey;
         this.apiKeyHash = apiKeyHash;
@@ -112,5 +151,8 @@ public class SourceConfigSnapshotJpaEntity {
             this.createdAt = now;
         }
         this.updatedAt = now;
+        this.sourceType = sourceType != null && !sourceType.isBlank() ? sourceType : "push_rest";
+        this.schedule = schedule;
+        this.parserConfig = parserConfig != null ? parserConfig : Map.of();
     }
 }

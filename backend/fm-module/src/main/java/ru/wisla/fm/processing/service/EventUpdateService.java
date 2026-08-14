@@ -8,6 +8,7 @@ import ru.wisla.fm.common.api.NotFoundException;
 import ru.wisla.fm.processing.api.EventDto;
 import ru.wisla.fm.processing.api.EventPatch;
 import ru.wisla.fm.processing.api.EventQueryService;
+import ru.wisla.fm.processing.adapter.out.lifecycle.EventLifecyclePublisher;
 import ru.wisla.fm.processing.adapter.out.persistence.EventJpaEntity;
 import ru.wisla.fm.processing.adapter.out.persistence.EventJpaRepository;
 
@@ -21,13 +22,16 @@ public class EventUpdateService {
     private final EventJpaRepository eventRepository;
     private final EventQueryService eventQueryService;
     private final ObjectMapper objectMapper;
+    private final EventLifecyclePublisher lifecyclePublisher;
 
     public EventUpdateService(EventJpaRepository eventRepository,
                               EventQueryService eventQueryService,
-                              ObjectMapper objectMapper) {
+                              ObjectMapper objectMapper,
+                              EventLifecyclePublisher lifecyclePublisher) {
         this.eventRepository = eventRepository;
         this.eventQueryService = eventQueryService;
         this.objectMapper = objectMapper;
+        this.lifecyclePublisher = lifecyclePublisher;
     }
 
     @Transactional
@@ -61,7 +65,9 @@ public class EventUpdateService {
             event.setItsmIncidentNumber(patch.itsmIncidentNumber());
         }
 
-        return eventQueryService.toDto(eventRepository.save(event));
+        EventJpaEntity saved = eventRepository.save(event);
+        lifecyclePublisher.afterStatusSave(saved.getStatus(), saved.getId(), saved.getCiId());
+        return eventQueryService.toDto(saved);
     }
 
     private void validateStatusTransition(String current, String next) {

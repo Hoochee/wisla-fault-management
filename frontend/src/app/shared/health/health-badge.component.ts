@@ -33,13 +33,13 @@ import { HEALTH_LABELS } from '../../core/health/health-profile.util';
       .dot[data-level='major'] { background: #ea580c; }
       .dot[data-level='warning'] { background: #eab308; }
       .dot[data-level='ok'] { background: #22c55e; }
-      .dot[data-level='unknown'] { background: #6b7280; }
+      .dot[data-level='unknown'] { background: var(--text-muted); }
       .label { font-size: 0.75rem; }
       .label[data-level='fatal'], .label[data-level='critical'] { color: #dc2626; }
       .label[data-level='major'] { color: #ea580c; }
       .label[data-level='warning'] { color: #eab308; }
       .label[data-level='ok'] { color: #22c55e; }
-      .label[data-level='unknown'] { color: #6b7280; }
+      .label[data-level='unknown'] { color: var(--text-muted); }
       .badge {
         display: inline-flex;
         align-items: center;
@@ -51,9 +51,9 @@ import { HEALTH_LABELS } from '../../core/health/health-profile.util';
       }
       .badge[data-level='fatal'], .badge[data-level='critical'] { background: #dc2626; }
       .badge[data-level='major'] { background: #ea580c; }
-      .badge[data-level='warning'] { background: #eab308; color: #1a1d23; }
+      .badge[data-level='warning'] { background: #eab308; color: var(--text-primary); }
       .badge[data-level='ok'] { background: #22c55e; }
-      .badge[data-level='unknown'] { background: #6b7280; }
+      .badge[data-level='unknown'] { background: var(--text-muted); }
     `,
   ],
 })

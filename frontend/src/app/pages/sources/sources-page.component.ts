@@ -188,7 +188,7 @@ interface SourceRow extends EventSource {
       .runtime-card[data-status='degraded'] { border-color: rgba(255, 193, 7, 0.4); }
       .runtime-card[data-status='down'] { border-color: rgba(244, 67, 54, 0.4); }
       .runtime-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
-      .runtime-head h2 { margin: 0; font-size: 0.9375rem; color: #fff; flex: 1; }
+      .runtime-head h2 { margin: 0; font-size: 0.9375rem; color: var(--text-primary); flex: 1; }
       .runtime-dot { width: 10px; height: 10px; border-radius: 50%; }
       .runtime-dot[data-status='ok'] { background: #4caf50; }
       .runtime-dot[data-status='degraded'] { background: #ffc107; }
@@ -218,7 +218,7 @@ interface SourceRow extends EventSource {
       .filter-chip.active {
         border-color: var(--accent);
         color: var(--accent);
-        background: rgba(74, 158, 255, 0.1);
+        background: rgba(47, 111, 237, 0.1);
       }
       .data-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
       .data-table th, .data-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); text-align: left; }
@@ -261,7 +261,7 @@ interface SourceRow extends EventSource {
         background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px;
         padding: 1.25rem; width: min(28rem, 92vw);
       }
-      .modal h2 { margin: 0 0 0.75rem; font-size: 1rem; color: #fff; }
+      .modal h2 { margin: 0 0 0.75rem; font-size: 1rem; color: var(--text-primary); }
       .modal p { margin: 0 0 0.75rem; font-size: 0.8125rem; color: var(--text-secondary); }
       .modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
       .btn, .btn-primary, .btn-danger {

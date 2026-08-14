@@ -109,7 +109,7 @@ import {
         cursor: pointer;
       }
       .btn-add:hover {
-        color: #fff;
+        color: var(--text-primary);
         border-color: var(--accent);
       }
       .add-form {
@@ -135,7 +135,7 @@ import {
         font-size: 0.75rem;
         border: 1px solid var(--accent);
         border-radius: 4px;
-        background: rgba(74, 158, 255, 0.15);
+        background: rgba(47, 111, 237, 0.15);
         color: var(--accent);
         cursor: pointer;
       }
@@ -168,7 +168,7 @@ import {
         line-height: 1;
       }
       .chip-remove:hover {
-        color: #fff;
+        color: var(--text-primary);
       }
       .and {
         font-size: 0.6875rem;

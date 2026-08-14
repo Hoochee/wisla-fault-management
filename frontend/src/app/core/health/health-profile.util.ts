@@ -5,15 +5,15 @@ import {
   ProductHealth,
   Severity,
 } from '../api/api.models';
-import { CiHealthProfile, HealthComponent, HealthTimelinePoint } from './health.models';
+import { CiHealthProfile } from './health.models';
 
 const SEVERITY_HEALTH: Record<Severity, { level: HealthLevel; percent: number }> = {
-  fatal: { level: 'fatal', percent: 5 },
-  critical: { level: 'critical', percent: 18 },
-  major: { level: 'major', percent: 42 },
-  minor: { level: 'major', percent: 58 },
-  warning: { level: 'warning', percent: 72 },
-  normal: { level: 'ok', percent: 96 },
+  fatal: { level: 'fatal', percent: 0 },
+  critical: { level: 'critical', percent: 25 },
+  major: { level: 'major', percent: 50 },
+  minor: { level: 'major', percent: 62 },
+  warning: { level: 'warning', percent: 75 },
+  normal: { level: 'ok', percent: 100 },
 };
 
 const HEAT_BASE: Record<Severity, string> = {
@@ -35,7 +35,7 @@ export const HEALTH_LABELS: Record<HealthLevel, string> = {
 };
 
 export function getHeatColor(severity: Severity, count: number): string {
-  if (count === 0) return '#252830';
+  if (count === 0) return '#e2e5ea';
   const hex = HEAT_BASE[severity];
   const opacity = Math.min(0.5 + count * 0.12, 1);
   const r = parseInt(hex.slice(1, 3), 16);
@@ -44,43 +44,39 @@ export function getHeatColor(severity: Severity, count: number): string {
   return `rgba(${r},${g},${b},${opacity})`;
 }
 
-function percentToLevel(percent: number): HealthLevel {
-  if (percent <= 10) return 'fatal';
+export function percentToLevel(percent: number): HealthLevel {
+  if (percent <= 0) return 'fatal';
   if (percent <= 25) return 'critical';
-  if (percent <= 45) return 'major';
-  if (percent <= 70) return 'warning';
+  if (percent <= 50) return 'major';
+  if (percent <= 75) return 'warning';
   return 'ok';
 }
 
-function buildTimeline(basePercent: number, level: HealthLevel): HealthTimelinePoint[] {
-  const levels: HealthLevel[] = ['ok', 'ok', 'warning', 'major', 'critical', 'major', 'warning', 'ok', 'ok', 'warning', 'major', 'ok'];
-  return Array.from({ length: 12 }, (_, i) => {
-    const drift = (i % 3) * 4 - 4;
-    const percent = Math.max(5, Math.min(100, basePercent + drift + (i > 6 ? 2 : 0)));
-    return {
-      time: `${String(i * 2).padStart(2, '0')}:00`,
-      level: i === 4 ? level : levels[i],
-      percent,
-    };
-  });
-}
-
-function defaultComponents(ci: ConfigurationItem, percent: number, level: HealthLevel): HealthComponent[] {
-  const damage = 100 - percent;
-  const names =
-    ci.ciType === 'server'
-      ? ['CPU / Load', 'Дисковая подсистема', 'Сетевой стек']
-      : ci.ciType === 'network'
-        ? ['Интерфейсы uplink', 'BGP / маршрутизация', 'Питание / PSU']
-        : ['Основной компонент', 'Сервисный слой'];
-  return names.map((name, idx) => ({
-    id: `cmp-${ci.id}-${idx}`,
-    name,
-    health: idx === 0 ? level : percentToLevel(percent + idx * 12),
-    healthPercent: Math.max(5, Math.min(100, percent + idx * 8)),
-    damageFromComponents: Math.round(damage * (0.5 - idx * 0.12)),
-    damageFromInfluence: idx === 0 ? Math.round(damage * 0.15) : 0,
-  }));
+export function getHealthPercentColor(percent: number): string {
+  const p = Math.max(0, Math.min(100, percent));
+  const stops: { at: number; rgb: [number, number, number] }[] = [
+    { at: 0, rgb: [220, 38, 38] },
+    { at: 25, rgb: [220, 38, 38] },
+    { at: 50, rgb: [234, 88, 12] },
+    { at: 75, rgb: [234, 179, 8] },
+    { at: 100, rgb: [34, 197, 94] },
+  ];
+  let lo = stops[0];
+  let hi = stops[stops.length - 1];
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (p >= stops[i].at && p <= stops[i + 1].at) {
+      lo = stops[i];
+      hi = stops[i + 1];
+      break;
+    }
+  }
+  const span = hi.at - lo.at || 1;
+  const t = (p - lo.at) / span;
+  const r = Math.round(lo.rgb[0] + (hi.rgb[0] - lo.rgb[0]) * t);
+  const g = Math.round(lo.rgb[1] + (hi.rgb[1] - lo.rgb[1]) * t);
+  const b = Math.round(lo.rgb[2] + (hi.rgb[2] - lo.rgb[2]) * t);
+  const opacity = 0.35 + (1 - p / 100) * 0.5;
+  return `rgba(${r},${g},${b},${opacity.toFixed(2)})`;
 }
 
 export function buildCiHealthProfile(ci: ConfigurationItem, events: Event[]): CiHealthProfile {
@@ -109,21 +105,18 @@ export function buildCiHealthProfile(ci: ConfigurationItem, events: Event[]): Ci
     currentHealth = SEVERITY_HEALTH[worst.severity].level;
   }
 
-  const timeline = buildTimeline(healthPercent, currentHealth);
-  const percents = timeline.map((p) => p.percent);
-
   return {
     ciId: ci.id,
     currentHealth,
     healthPercent,
-    minToday: percentToLevel(Math.min(...percents)),
-    minTodayPercent: Math.min(...percents),
-    maxToday: percentToLevel(Math.max(...percents)),
-    maxTodayPercent: Math.max(...percents),
-    components: defaultComponents(ci, healthPercent, currentHealth),
+    minToday: currentHealth,
+    minTodayPercent: healthPercent,
+    maxToday: currentHealth,
+    maxTodayPercent: healthPercent,
+    components: [],
     dependents: [],
     signalsBySeverity,
-    timeline,
+    timeline: [],
   };
 }
 

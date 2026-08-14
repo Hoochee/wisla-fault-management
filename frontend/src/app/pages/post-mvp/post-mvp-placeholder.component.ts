@@ -15,7 +15,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
   styles: [
     `
       .placeholder { text-align: center; padding: 4rem 2rem; }
-      h1 { color: #fff; margin-bottom: 0.5rem; }
+      h1 { color: var(--text-primary); margin-bottom: 0.5rem; }
       p { color: var(--text-muted); margin-bottom: 1.5rem; }
       a { color: var(--accent); text-decoration: none; }
     `,
