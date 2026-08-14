@@ -56,7 +56,7 @@ export interface TimeRangeSelection {
         min-width: 0;
         border: none;
         padding: 0;
-        background: rgba(74, 158, 255, 0.6);
+        background: rgba(47, 111, 237, 0.6);
         border-radius: 2px 2px 0 0;
         cursor: pointer;
         transition: background 0.15s;

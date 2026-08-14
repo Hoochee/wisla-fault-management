@@ -49,6 +49,9 @@
 | api_key_hash | VARCHAR(255) | NOT NULL | Хэш API-ключа источника для аутентификации webhook |
 | endpoint | VARCHAR(512) | NOT NULL | Базовый URL fm-module для исходящего ingest |
 | ttl_expires_at | TIMESTAMPTZ | NOT NULL | Истечение кэша; после — повторный pull конфигурации |
+| source_type | VARCHAR(32) | NOT NULL DEFAULT `'push_rest'` | Копия `event_sources.type` (`push_rest`, `pull_etl`, …) |
+| schedule | VARCHAR(64) | | Интервал (`30s`) или CRON для `pull_etl` |
+| parser_config | JSONB | NOT NULL DEFAULT `'{}'` | Цели Prometheus scrape и пороги (`parserConfig`) |
 | created_at | TIMESTAMPTZ | NOT NULL DEFAULT NOW() | Первое сохранение снимка |
 | updated_at | TIMESTAMPTZ | NOT NULL DEFAULT NOW() | Последнее обновление снимка |
 
@@ -65,6 +68,22 @@
 |------|---------|---------|
 | `idx_source_config_snapshots_source_key` | `(source_key)` UNIQUE | Резолв sourceKey → source_id на webhook |
 | `idx_source_config_snapshots_ttl` | `(ttl_expires_at)` | Инвалидация просроченных снимков |
+
+---
+
+### `pull_metric_states`
+
+Состояние последнего scrape по метрике. Используется `PullEtlScheduler`: событие в Kafka `fm.raw-events` публикуется **только при смене** `last_severity`. PK `(source_id, external_id)`. `external_id` = `{sourceKey}:{ciFqdn}:{metricName}`. Liquibase `005-pull-etl.sql`.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| source_id | UUID | PK | Логическая ссылка на `event_sources.id` в fm-module |
+| external_id | VARCHAR(512) | PK | Стабильный ключ метрики |
+| last_severity | VARCHAR(16) | | Последняя оценённая критичность (включая OK) |
+| last_value | DOUBLE PRECISION | | Последнее числовое значение метрики |
+| updated_at | TIMESTAMPTZ | NOT NULL | Момент последнего scrape/оценки |
+
+**PRIMARY KEY:** `(source_id, external_id)`
 
 ---
 
@@ -94,6 +113,7 @@
 1. `001_init.sql` — `buffered_messages`, `source_config_snapshots`, `adapter_heartbeats`
 2. `002_buffered_messages_retry_index.sql` — partial index на `next_retry_at`
 3. `003_source_config_source_key.sql` — `source_key`, unique index (если не в 001)
+4. `005-pull-etl.sql` — колонки `source_type`, `schedule`, `parser_config` на `source_config_snapshots`; таблица `pull_metric_states`
 
 ---
 
@@ -105,6 +125,7 @@
 | `endpoint` | fm-module | Базовый URL BFF (`http://fm-module:8080` в Docker Compose) |
 | `filter_rules` | fm-module (`event_sources.filter_rules`) | Денормализованная копия для предфильтрации на адаптере |
 | `api_key_hash` | fm-module (`event_sources` credentials) | Хэш для проверки входящего `X-Source-Key` / `sourceKey` |
+| `source_type`, `schedule`, `parser_config` | fm-module (`GET /api/v1/internal/sources`) | Копия type/schedule/parserConfig для pull scrape |
 
 ---
 
@@ -114,7 +135,9 @@
 |--------------|---------|----------|
 | `POST /webhook/{sourceKey}` | `source_config_snapshots` | Чтение кэша, проверка ключа и `filter_rules` |
 | `POST /webhook/{sourceKey}` | `buffered_messages` | INSERT при недоступности fm-module |
+| `GET /api/v1/internal/sources` (fm-module) | `source_config_snapshots` | UPSERT кэша включая `source_type`, `schedule`, `parser_config` |
 | `GET /internal/sources/{sourceId}/config` | `source_config_snapshots` | SELECT по `source_id` |
 | `POST /internal/probe` | `source_config_snapshots` | Чтение конфигурации; опционально INSERT в `buffered_messages` |
+| `PullEtlScheduler` (`type=pull_etl`) | `pull_metric_states` | UPSERT состояния; публикация в Kafka `fm.raw-events` при смене severity (не `POST /api/v1/ingest`) |
 | Heartbeat worker | `adapter_heartbeats` | INSERT после каждой отправки |
 | Retry worker | `buffered_messages` | SELECT/UPDATE/DELETE при успешной доставке |

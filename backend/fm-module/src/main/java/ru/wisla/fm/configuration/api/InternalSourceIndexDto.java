@@ -8,6 +8,9 @@ public record InternalSourceIndexDto(
         String sourceKey,
         String apiKeyHash,
         String status,
-        Map<String, Object> filterRules
+        Map<String, Object> filterRules,
+        String type,
+        String schedule,
+        Map<String, Object> parserConfig
 ) {
 }

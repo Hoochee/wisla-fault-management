@@ -1,0 +1,125 @@
+# Gift Shop demo overlay. Same Compose project as FM so services share the network:
+#
+#   docker compose -f backend/docker-compose.yaml up -d --build
+#   docker compose -p backend -f demo/gift-shop/docker-compose.yaml up -d --build
+#
+# Do not merge both -f in one command: Compose v5 resolves ./apps relative to backend/.
+# cAdvisor is a Compose profile (`cadvisor`) so Windows hosts are not blocked.
+
+services:
+  giftshop-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: giftshop
+      POSTGRES_PASSWORD: giftshop
+      POSTGRES_DB: giftshop
+    ports:
+      - "5433:5432"
+    volumes:
+      - giftshop_postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U giftshop -d giftshop"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  giftshop-catalog:
+    build:
+      context: ./apps
+      dockerfile: Dockerfile
+    ports:
+      - "8092:8092"
+    environment:
+      SERVICE_ROLE: catalog
+      PORT: "8092"
+      DATABASE_URL: postgres://giftshop:giftshop@giftshop-postgres:5432/giftshop
+    depends_on:
+      giftshop-postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:'+process.env.PORT+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+
+  giftshop-checkout:
+    build:
+      context: ./apps
+      dockerfile: Dockerfile
+    ports:
+      - "8093:8093"
+    environment:
+      SERVICE_ROLE: checkout
+      PORT: "8093"
+      DATABASE_URL: postgres://giftshop:giftshop@giftshop-postgres:5432/giftshop
+    depends_on:
+      giftshop-postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:'+process.env.PORT+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+
+  giftshop-storefront:
+    build:
+      context: ./apps
+      dockerfile: Dockerfile
+    ports:
+      - "8091:8091"
+    environment:
+      SERVICE_ROLE: storefront
+      PORT: "8091"
+      CATALOG_URL: http://giftshop-catalog:8092
+      CHECKOUT_URL: http://giftshop-checkout:8093
+    depends_on:
+      giftshop-catalog:
+        condition: service_healthy
+      giftshop-checkout:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:'+process.env.PORT+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+
+  # Best-effort runtime metrics. Omit on Windows / Docker Desktop if it fails:
+  #   docker compose ... --profile cadvisor up -d
+  giftshop-cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    profiles: ["cadvisor"]
+    ports:
+      - "8088:8080"
+    restart: "no"
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+
+volumes:
+  giftshop_postgres_data:

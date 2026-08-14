@@ -253,7 +253,10 @@ public class SourceService {
                         entity.getWebhookPathKey(),
                         entity.getApiKeyHash(),
                         entity.getStatus(),
-                        parseJson(entity.getFilterRules())
+                        parseJson(entity.getFilterRules()),
+                        entity.getType(),
+                        entity.getSchedule(),
+                        parseJson(entity.getParserConfig())
                 ))
                 .toList();
     }

@@ -11,7 +11,9 @@ Core characteristics:
 - Product docs and OpenAPI under `docs/`.
 - Implemented capabilities tracked in `openspec/specs/`.
 
-Default git branch: **`main`**. Feature branches: `feature/WISLA-<n>` from `origin/main` with `--no-track`.
+Default git branch: **`main`**. Feature branches: `feature/WISLA-<n>` from `origin/main` with `--no-track` (other keys: `feature/<FULL-KEY>`).
+
+Product backlog (deferred work): **[`BACKLOG.md`](BACKLOG.md)** at repo root. Items have a priority (Критический / Высокий / Средний / Низкий). If the user asks what to do next / to take a backlog item, read that file — do not invent scope.
 
 ## Module Layout
 
@@ -26,6 +28,8 @@ Default git branch: **`main`**. Feature branches: `feature/WISLA-<n>` from `orig
 | `prototype/` | Vite + React exploratory UI (not the production SPA) |
 | `docs/` | Requirements, architecture, tech stack, page specs, OpenAPI |
 | `openspec/` | Spec-driven change workflow (`config.yaml`, `specs/`, `changes/`) |
+| `demo/gift-shop/` | Demo overlay (catalog/checkout/storefront + DB); monitored target, not an FM service — added with `product-health-graph` |
+| `BACKLOG.md` | Deferred product work for `/build-feature` |
 
 ## Tech notes
 
@@ -59,6 +63,7 @@ cd frontend && npm run test:e2e
 
 - OpenSpec: `/opsx:explore`, `/opsx:propose`, `/opsx:apply`, `/opsx:sync`, `/opsx:archive`
 - Full feature orchestration: `/build-feature` (see `build-feature/`, `.agents/`, `openspec/TEAM.md`)
+- Deferred work: [`BACKLOG.md`](BACKLOG.md) — consult when the user asks for the next task or a backlog item
 - Prefer TDD and existing module boundaries; do not invent new top-level services without approval
 
 ## Do not

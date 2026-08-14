@@ -48,6 +48,8 @@ import {
 
   ProductHealthDetail,
 
+  ProductHealthHistoryBucket,
+
   ProductPatchRequest,
 
   PushNotificationList,
@@ -79,6 +81,7 @@ import {
   UserPatchRequest,
 
 } from './api.models';
+import { mapHistoryBuckets, mapProductHealth, mapProductHealthDetail } from '../health/health-snapshot.mapper';
 
 
 
@@ -278,7 +281,7 @@ export class FmApiService {
 
   getProducts(): Observable<ProductHealth[]> {
 
-    return this.api.get<ProductHealth[]>('/health/products');
+    return this.api.get<ProductHealth[]>('/health/products').pipe(map((rows) => rows.map(mapProductHealth)));
 
   }
 
@@ -286,7 +289,33 @@ export class FmApiService {
 
   getProduct(id: string): Observable<ProductHealthDetail> {
 
-    return this.api.get<ProductHealthDetail>(`/health/products/${id}`);
+    return this.api.get<ProductHealthDetail>(`/health/products/${id}`).pipe(map(mapProductHealthDetail));
+
+  }
+
+
+
+  getProductHistory(
+
+    id: string,
+
+    params?: { from?: string; to?: string; bucketMinutes?: number },
+
+  ): Observable<ProductHealthHistoryBucket[]> {
+
+    const query: Record<string, string | number> = {};
+
+    if (params?.from) query['from'] = params.from;
+
+    if (params?.to) query['to'] = params.to;
+
+    if (params?.bucketMinutes != null) query['bucketMinutes'] = params.bucketMinutes;
+
+    return this.api
+
+      .get<ProductHealthHistoryBucket[]>(`/health/products/${id}/history`, Object.keys(query).length ? query : undefined)
+
+      .pipe(map(mapHistoryBuckets));
 
   }
 

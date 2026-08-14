@@ -20,6 +20,7 @@
     "@angular/platform-browser": "^18.2.0",
     "@angular/platform-browser-dynamic": "^18.2.0",
     "@angular/router": "^18.2.0",
+    "d3-sankey": "^0.12.3",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.14.10"
@@ -29,6 +30,7 @@
     "@angular/cli": "^18.2.21",
     "@angular/compiler-cli": "^18.2.0",
     "@playwright/test": "^1.61.0",
+    "@types/d3-sankey": "^0.12.4",
     "@types/jasmine": "~5.1.0",
     "jasmine-core": "~5.2.0",
     "jsdom": "^26.1.0",

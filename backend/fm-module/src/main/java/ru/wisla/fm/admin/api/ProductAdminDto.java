@@ -10,6 +10,7 @@ public record ProductAdminDto(
         String tenant,
         String site,
         List<String> tags,
-        List<UUID> ciIds
+        List<UUID> ciIds,
+        List<ProductComponentAdminDto> components
 ) {
 }

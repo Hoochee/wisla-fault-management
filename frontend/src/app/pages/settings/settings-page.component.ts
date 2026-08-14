@@ -68,7 +68,7 @@ import { AuthService } from '../../core/auth/auth.service';
       .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
       @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
       .card { background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
-      .card h2 { margin: 0 0 0.75rem; font-size: 0.9375rem; color: #fff; }
+      .card h2 { margin: 0 0 0.75rem; font-size: 0.9375rem; color: var(--text-primary); }
       dl { display: grid; grid-template-columns: 160px 1fr; gap: 0.5rem; font-size: 0.8125rem; margin: 0; }
       dt { color: var(--text-muted); }
       dd { margin: 0; color: var(--text-secondary); }

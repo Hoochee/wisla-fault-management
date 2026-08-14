@@ -163,7 +163,7 @@ type EventTab = 'attributes' | 'journal' | 'relations';
     `
       .back { color: var(--accent); text-decoration: none; font-size: 0.8125rem; }
       .title-row { display: flex; align-items: center; gap: 0.75rem; margin: 0.75rem 0 0.25rem; flex-wrap: wrap; }
-      h1 { margin: 0; font-size: 1.25rem; color: #fff; }
+      h1 { margin: 0; font-size: 1.25rem; color: var(--text-primary); }
       .repeat { color: var(--text-muted); font-size: 0.875rem; }
       .meta { color: var(--text-muted); font-size: 0.8125rem; }
       .info-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
@@ -182,23 +182,23 @@ type EventTab = 'attributes' | 'journal' | 'relations';
       .panel { background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
       .panel-toolbar { display: flex; justify-content: flex-end; margin-bottom: 0.75rem; }
       .link-btn { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.75rem; }
-      .json-block { margin: 0; padding: 1rem; background: #1a1d23; border-radius: 6px; font-size: 0.75rem; overflow: auto; color: var(--text-secondary); }
+      .json-block { margin: 0; padding: 1rem; background: var(--bg-primary); border-radius: 6px; font-size: 0.75rem; overflow: auto; color: var(--text-secondary); }
       .attr-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
       .attr-table th, .attr-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); text-align: left; }
       .attr-table th { color: var(--text-muted); font-size: 0.75rem; }
       .muted { color: var(--text-muted); }
       .mono { font-family: var(--font-mono); }
       .empty { margin: 0; color: var(--text-muted); font-size: 0.875rem; }
-      .log-entry { display: flex; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.8125rem; border-left: 2px solid rgba(74, 158, 255, 0.3); padding-left: 0.75rem; }
+      .log-entry { display: flex; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.8125rem; border-left: 2px solid rgba(47, 111, 237, 0.3); padding-left: 0.75rem; }
       .log-time { color: var(--text-muted); white-space: nowrap; font-size: 0.75rem; }
-      .log-action { color: #fff; font-weight: 500; }
+      .log-action { color: var(--text-primary); font-weight: 500; }
       .log-user { color: var(--text-muted); }
       .log-details { margin: 0.25rem 0 0; color: var(--text-secondary); font-size: 0.75rem; }
       .rel-section { margin-bottom: 1.25rem; }
       .rel-section h3 { margin: 0 0 0.5rem; font-size: 0.6875rem; text-transform: uppercase; color: var(--text-muted); font-weight: 500; }
-      .rel-link { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; margin-bottom: 0.375rem; background: #1a1d23; border: 1px solid var(--border); border-radius: 6px; text-decoration: none; color: var(--text-secondary); font-size: 0.8125rem; }
+      .rel-link { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; margin-bottom: 0.375rem; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; text-decoration: none; color: var(--text-secondary); font-size: 0.8125rem; }
       .rel-link:hover { border-color: var(--accent); }
-      .ci-card { padding: 0.5rem 0.75rem; background: #1a1d23; border: 1px solid var(--border); border-radius: 6px; font-size: 0.8125rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+      .ci-card { padding: 0.5rem 0.75rem; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; font-size: 0.8125rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
     `,
   ],
 })

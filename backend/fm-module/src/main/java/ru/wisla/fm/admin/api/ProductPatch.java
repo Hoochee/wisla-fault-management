@@ -9,6 +9,7 @@ public record ProductPatch(
         String tenant,
         String site,
         List<String> tags,
-        List<UUID> ciIds
+        List<UUID> ciIds,
+        List<ProductComponentPatch> components
 ) {
 }

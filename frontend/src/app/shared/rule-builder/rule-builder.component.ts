@@ -381,20 +381,20 @@ let nextBlockNum = 100;
         gap: 1rem;
       }
       .panel {
-        background: #252830;
-        border: 1px solid #3a3f4b;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
         border-radius: 8px;
         padding: 1rem;
       }
       .panel h3 {
         margin: 0 0 0.75rem;
         font-size: 0.875rem;
-        color: #fff;
+        color: var(--text-primary);
       }
       .panel h4 {
         margin: 0 0 0.5rem;
         font-size: 0.75rem;
-        color: #fff;
+        color: var(--text-primary);
       }
       .field {
         margin-bottom: 0.75rem;
@@ -403,20 +403,20 @@ let nextBlockNum = 100;
       .label-muted {
         display: block;
         font-size: 0.6875rem;
-        color: #6b7280;
+        color: var(--text-muted);
         margin-bottom: 0.25rem;
       }
       .value {
         font-size: 0.75rem;
-        color: #d1d5db;
+        color: var(--text-primary);
       }
       .input {
         width: 100%;
         padding: 0.375rem 0.5rem;
-        background: #1a1d23;
-        border: 1px solid #3a3f4b;
+        background: var(--bg-primary);
+        border: 1px solid var(--border);
         border-radius: 4px;
-        color: #fff;
+        color: var(--text-primary);
         font-size: 0.75rem;
         box-sizing: border-box;
       }
@@ -428,12 +428,12 @@ let nextBlockNum = 100;
       }
       .hint {
         font-size: 0.6875rem;
-        color: #6b7280;
+        color: var(--text-muted);
         margin: 0 0 0.5rem;
       }
       .hint code {
         font-family: var(--font-mono);
-        color: #9ca3af;
+        color: var(--text-secondary);
       }
       .palette-btn {
         display: block;
@@ -441,20 +441,20 @@ let nextBlockNum = 100;
         text-align: left;
         padding: 0.375rem 0.5rem;
         margin-bottom: 0.25rem;
-        background: #1a1d23;
-        border: 1px solid #3a3f4b;
+        background: var(--bg-primary);
+        border: 1px solid var(--border);
         border-radius: 4px;
-        color: #9ca3af;
+        color: var(--text-secondary);
         font-size: 0.75rem;
         cursor: pointer;
       }
       .palette-btn:hover {
-        border-color: rgba(74, 158, 255, 0.5);
-        color: #e5e7eb;
+        border-color: rgba(47, 111, 237, 0.5);
+        color: var(--text-primary);
       }
       .palette-btn--post-mvp {
         border-color: rgba(245, 158, 11, 0.35);
-        color: #9ca3af;
+        color: var(--text-secondary);
       }
       .post-mvp-tag {
         margin-left: 0.375rem;
@@ -474,7 +474,7 @@ let nextBlockNum = 100;
       }
       .links {
         padding-top: 0.5rem;
-        border-top: 1px solid #3a3f4b;
+        border-top: 1px solid var(--border);
       }
       .link-group {
         margin-bottom: 0.5rem;
@@ -482,7 +482,7 @@ let nextBlockNum = 100;
       .link-label {
         font-size: 0.625rem;
         text-transform: uppercase;
-        color: #6b7280;
+        color: var(--text-muted);
       }
       .link-row {
         display: flex;
@@ -490,7 +490,7 @@ let nextBlockNum = 100;
         align-items: center;
         gap: 0.5rem;
         font-size: 0.75rem;
-        color: #d1d5db;
+        color: var(--text-primary);
         margin-top: 0.25rem;
       }
       .unlink {
@@ -508,7 +508,7 @@ let nextBlockNum = 100;
       }
       .btn-link {
         padding: 0.375rem 0.5rem;
-        background: #4a9eff;
+        background: var(--accent);
         color: #fff;
         border: none;
         border-radius: 4px;

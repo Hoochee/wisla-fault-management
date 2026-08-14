@@ -31,16 +31,16 @@ import { RouterLink } from '@angular/router';
         margin: 0;
         font-size: 1.5rem;
         font-weight: 600;
-        color: #fff;
+        color: var(--text-primary);
       }
       .subtitle {
         margin: 0.25rem 0 0;
-        color: #9ca3af;
+        color: var(--text-secondary);
         font-size: 0.875rem;
       }
       .btn-primary {
         padding: 0.5rem 1rem;
-        background: #4a9eff;
+        background: var(--accent);
         color: #fff;
         border-radius: 6px;
         text-decoration: none;
@@ -48,7 +48,7 @@ import { RouterLink } from '@angular/router';
         white-space: nowrap;
       }
       .btn-primary:hover {
-        background: #3a8eef;
+        background: #2563eb;
       }
     `,
   ],

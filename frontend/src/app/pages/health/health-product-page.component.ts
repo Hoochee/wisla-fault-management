@@ -4,11 +4,24 @@ import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FmApiService } from '../../core/api/fm-api.service';
 import { AuthService } from '../../core/auth/auth.service';
-import { ConfigurationItem, Event, ProductAdmin, ProductHealth, ProductHealthDetail } from '../../core/api/api.models';
+import { formatApiError } from '../../core/api/api-error';
+import {
+  ConfigurationItem,
+  Event,
+  ProductAdmin,
+  ProductComponentAdmin,
+  ProductComponentPatch,
+  ProductHealthDetail,
+  ProductHealthHistoryBucket,
+} from '../../core/api/api.models';
 import { CiHealthProfile } from '../../core/health/health.models';
-import { buildProfiles, findWorstCi } from '../../core/health/health-profile.util';
+import { hasSankeyGraph } from '../../core/health/health-snapshot.mapper';
+import { buildProfiles, findWorstCi, getHealthPercentColor, percentToLevel } from '../../core/health/health-profile.util';
 import { CiSidebarComponent } from '../../shared/health/ci-sidebar.component';
+import { ComponentWeightEditorComponent } from '../../shared/health/component-weight-editor.component';
 import { HealthBadgeComponent } from '../../shared/health/health-badge.component';
+import { HealthHistoryHeatmapComponent } from '../../shared/health/health-history-heatmap.component';
+import { MonqHealthGraphComponent } from '../../shared/health/monq-health-graph.component';
 import { OperativeCenterPanelComponent } from '../../shared/health/operative-center-panel.component';
 import { SeverityBadgeComponent } from '../../shared/severity-badge/severity-badge.component';
 
@@ -30,6 +43,9 @@ interface ProductForm {
     OperativeCenterPanelComponent,
     HealthBadgeComponent,
     SeverityBadgeComponent,
+    MonqHealthGraphComponent,
+    HealthHistoryHeatmapComponent,
+    ComponentWeightEditorComponent,
   ],
   templateUrl: './health-product-page.component.html',
   styleUrl: './health-product-page.component.scss',
@@ -40,13 +56,19 @@ export class HealthProductPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
-  product: ProductHealth | null = null;
+  product: ProductHealthDetail | null = null;
   productAdmin: ProductAdmin | null = null;
   ciList: ConfigurationItem[] = [];
   events: Event[] = [];
   profiles: Record<string, CiHealthProfile> = {};
   selectedCiId = '';
   productId = '';
+  history: ProductHealthHistoryBucket[] = [];
+  historyError = false;
+  graphError = false;
+  readonly percentToLevel = percentToLevel;
+  readonly getHealthPercentColor = getHealthPercentColor;
+  readonly hasSankeyGraph = hasSankeyGraph;
 
   readonly isAdmin = this.auth.isAdmin;
   form: ProductForm = this.emptyForm();
@@ -59,6 +81,7 @@ export class HealthProductPageComponent implements OnInit {
   pickerCiIds: string[] = [];
   readonly deleteTarget = signal(false);
   readonly deleteBlocked = signal(false);
+  readonly weightError = signal('');
 
   readonly filteredCis = computed(() => {
     const q = this.ciSearch.trim().toLowerCase();
@@ -204,8 +227,47 @@ export class HealthProductPageComponent implements OnInit {
     });
   }
 
+  get editorComponents(): ProductComponentAdmin[] {
+    if (this.productAdmin?.components?.length) {
+      return this.productAdmin.components;
+    }
+    return (this.product?.components ?? []).map((c) => ({
+      id: c.code,
+      code: c.code,
+      name: c.name,
+      weight: c.weight ?? 0,
+      influenceType: c.influenceType ?? 'weighted',
+      criticalThreshold: 100,
+      ciIds: c.ciIds ?? [],
+    }));
+  }
+
+  saveComponentWeights(components: ProductComponentPatch[]): void {
+    if (!this.product) return;
+    this.saving.set(true);
+    this.weightError.set('');
+    this.api.patchProduct(this.product.id, { components }).subscribe({
+      next: (updated) => {
+        this.saving.set(false);
+        this.productAdmin = updated;
+        this.reloadCard();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.saving.set(false);
+        this.weightError.set(formatApiError(err, 'Не удалось сохранить компоненты'));
+      },
+    });
+  }
+
   private reloadCard(): void {
-    this.api.getProduct(this.productId).subscribe((detail) => this.applyDetail(detail));
+    this.api.getProduct(this.productId).subscribe({
+      next: (detail) => this.applyDetail(detail),
+      error: () => {
+        this.product = null;
+        this.graphError = true;
+      },
+    });
+    this.loadHistory();
     if (this.isAdmin()) {
       this.api.getProductAdmin(this.productId).subscribe({
         next: (admin) => (this.productAdmin = admin),
@@ -214,10 +276,33 @@ export class HealthProductPageComponent implements OnInit {
     }
   }
 
+  private loadHistory(): void {
+    const to = new Date();
+    const from = new Date(to);
+    from.setHours(0, 0, 0, 0);
+    this.historyError = false;
+    this.api
+      .getProductHistory(this.productId, {
+        from: from.toISOString(),
+        to: to.toISOString(),
+        bucketMinutes: 15,
+      })
+      .subscribe({
+        next: (buckets) => {
+          this.history = buckets;
+        },
+        error: () => {
+          this.history = [];
+          this.historyError = true;
+        },
+      });
+  }
+
   private applyDetail(detail: ProductHealthDetail): void {
     this.product = detail;
     this.ciList = detail.configurationItems ?? [];
     this.events = detail.activeEvents ?? [];
+    this.graphError = !hasSankeyGraph(detail.sankey);
     this.profiles = buildProfiles(this.ciList, this.events);
     const worst = findWorstCi(this.ciList, this.profiles);
     if (worst) this.selectedCiId = worst.id;

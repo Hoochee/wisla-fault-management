@@ -21,12 +21,13 @@ OpenSpec slash commands: `/opsx:explore`, `/opsx:propose`, `/opsx:apply`, `/opsx
 Input: `/build-feature WISLA-12345` or `/build-feature <change-name>` or description of the feature.
 
 1. Resolve Jira key (if provided) via chrome-devtools MCP — Wellink browse URL `https://support.wellink.ru/browse/<KEY>`
-2. Read `openspec/changes/<change>/.feature-state.json` (create on bootstrap if missing)
-3. Determine current `phase`; execute **ONE phase step** per invocation unless user asks to continue
-4. At **user-gates** — ask user in Russian; wait for explicit approval
-5. At **auto-gates** — verify artifact DoD or test exit code; advance without asking
-6. Delegate via Task tool per [delegation/task-tool.md](delegation/task-tool.md)
-7. Update `.feature-state.json` after each subagent completes
+2. If the user asks «что дальше», «из беклога», «следующую задачу», or `/build-feature` with no key/description — read [`BACKLOG.md`](../BACKLOG.md) and offer a `ready` item (explain `blocked`/`parked`). Do not invent a new epic instead of the backlog.
+3. Read `openspec/changes/<change>/.feature-state.json` (create on bootstrap if missing)
+4. Determine current `phase`; execute **ONE phase step** per invocation unless user asks to continue
+5. At **user-gates** — ask user in Russian; wait for explicit approval
+6. At **auto-gates** — verify artifact DoD or test exit code; advance without asking
+7. Delegate via Task tool per [delegation/task-tool.md](delegation/task-tool.md)
+8. Update `.feature-state.json` after each subagent completes
 
 For new or materially changed backend behavior, the design and review phases must verify
 `docs/adr/ADR-001-hexagonal-architecture.md` and its six-part checklist:

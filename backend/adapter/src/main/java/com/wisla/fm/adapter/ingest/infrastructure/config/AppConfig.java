@@ -5,12 +5,16 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.wisla.fm.adapter.ingest.application.port.out.ApiKeyVerifierPort;
 import com.wisla.fm.adapter.ingest.application.port.out.BufferedEventStorePort;
 import com.wisla.fm.adapter.ingest.application.port.out.FmModuleSourceConfigPort;
+import com.wisla.fm.adapter.ingest.application.port.out.PrometheusScrapePort;
+import com.wisla.fm.adapter.ingest.application.port.out.PullMetricStateStorePort;
 import com.wisla.fm.adapter.ingest.application.port.out.RawEventPublisherPort;
 import com.wisla.fm.adapter.ingest.application.port.out.SourceConfigLookupPort;
 import com.wisla.fm.adapter.ingest.application.port.out.SourceConfigStorePort;
 import com.wisla.fm.adapter.ingest.application.service.ReceiveWebhookEventService;
 import com.wisla.fm.adapter.ingest.application.service.RetryBufferedEventsService;
+import com.wisla.fm.adapter.ingest.application.service.ScrapePullSourcesService;
 import com.wisla.fm.adapter.ingest.application.service.SyncSourceConfigService;
+import com.wisla.fm.adapter.ingest.domain.MetricThresholdEvaluator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -88,6 +92,30 @@ public class AppConfig {
                 sourceConfigStore,
                 clock,
                 properties.fmModuleBaseUrl()
+        );
+    }
+
+    @Bean
+    MetricThresholdEvaluator metricThresholdEvaluator() {
+        return new MetricThresholdEvaluator();
+    }
+
+    @Bean
+    ScrapePullSourcesService scrapePullSourcesService(
+            SourceConfigLookupPort sourceConfigLookup,
+            PrometheusScrapePort prometheusScrape,
+            PullMetricStateStorePort pullMetricStates,
+            RawEventPublisherPort rawEventPublisher,
+            MetricThresholdEvaluator metricThresholdEvaluator,
+            AdapterProperties properties
+    ) {
+        return new ScrapePullSourcesService(
+                sourceConfigLookup,
+                prometheusScrape,
+                pullMetricStates,
+                rawEventPublisher,
+                metricThresholdEvaluator,
+                properties.version()
         );
     }
 }

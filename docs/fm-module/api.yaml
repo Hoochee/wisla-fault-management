@@ -993,6 +993,11 @@ paths:
     get:
       tags: [health]
       summary: Product heatmap data
+      description: |
+        Server-side product health snapshot for `/health`.
+        Additive fields `healthPercent`, `damagePercent`, and `components[]` come from
+        `product_health_snapshot`. Existing `maxSeverity`, `activeEventCount`, and `ciIds`
+        are unchanged. Requires JWT.
       operationId: listProductHealth
       x-mvp: true
       parameters:
@@ -1017,11 +1022,17 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ProductHealth'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /api/v1/health/products/{id}:
     get:
       tags: [health]
-      summary: Product card with CIs and active events
+      summary: Product card with CIs, Sankey, and active events
+      description: |
+        Product health detail from the persisted snapshot: percents, component breakdown,
+        `sankey.nodes` / `sankey.links` (`from`, `to`, `damage`), min/max health today, CIs.
+        Existing `maxSeverity`, `activeEventCount`, and `ciIds` remain. Requires JWT.
       operationId: getProductHealth
       x-mvp: true
       parameters:
@@ -1038,6 +1049,56 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProductHealthDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/health/products/{id}/history:
+    get:
+      tags: [health]
+      summary: Product health history buckets (heatmap)
+      description: |
+        Time-bucketed health history for the product card heatmap.
+        Default `bucketMinutes` is 15. Worst status in each cell is `worstSeverity`.
+        Requires JWT.
+      operationId: getProductHealthHistory
+      x-mvp: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: bucketMinutes
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 15
+          description: Heatmap bucket size in minutes (default 15)
+      responses:
+        '200':
+          description: History buckets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductHealthHistoryBucket'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -1423,7 +1484,9 @@ paths:
       tags: [admin]
       summary: Create product
       description: |
-        Creates a product. When `ciIds` is provided, links each CI via `product_ci`.
+        Creates a product. When `ciIds` is provided, links each CI via `product_ci`
+        and binds new CIs to the product `COMMON` component (`weight=100`, `influenceType=weighted`),
+        creating `COMMON` if it does not exist.
         Requires administrator role.
       operationId: createProduct
       x-mvp: true
@@ -1484,7 +1547,12 @@ paths:
       description: |
         Partial update of product attributes. When `ciIds` is **present**, all existing
         `product_ci` rows for this product are deleted and replaced with the provided list
-        (empty array clears all links). When `ciIds` is **omitted**, CI membership is unchanged.
+        (empty array clears all links). Newly added CIs that are not already slotted are bound
+        to `COMMON`. When `ciIds` is **omitted**, CI membership is unchanged.
+        Optional `components` replaces health slots (`code`, `name`, `weight`, `influenceType`,
+        `criticalThreshold`, `ciIds`). Omit `components` to leave slots unchanged.
+        At least one component `weight` must be > 0; a CI may belong to at most one slot
+        of the same product (otherwise **400**).
         Requires administrator role.
       operationId: patchProduct
       x-mvp: true
@@ -1812,6 +1880,31 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+
+  /api/v1/internal/sources:
+    get:
+      tags: [internal]
+      summary: Source index for adapter config sync
+      description: |
+        Called by adapter to refresh `source_config_snapshots`.
+        Additive fields `type`, `schedule`, and `parserConfig` sit alongside existing
+        `sourceId`, `sourceKey`, `apiKeyHash`, `status`, and `filterRules`.
+        Authenticated with `X-Service-Key`.
+      operationId: listInternalSources
+      security:
+        - serviceApiKey: []
+      x-mvp: true
+      responses:
+        '200':
+          description: Source index for adapter sync
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InternalSourceIndex'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /api/v1/internal/sources/{id}/config:
     get:
@@ -2847,9 +2940,45 @@ components:
           type: string
         type:
           $ref: '#/components/schemas/SourceType'
+        schedule:
+          type: string
+          description: Pull interval (`30s`) or CRON; used when `type=pull_etl`
+          nullable: true
+        parserConfig:
+          type: object
+          additionalProperties: true
+          description: Prometheus scrape targets and threshold rules (`{}` for `push_rest`)
         updatedAt:
           type: string
           format: date-time
+
+    InternalSourceIndex:
+      type: object
+      required: [sourceId, sourceKey, apiKeyHash, status, filterRules, type]
+      properties:
+        sourceId:
+          type: string
+          format: uuid
+        sourceKey:
+          type: string
+          description: Public webhook key segment
+        apiKeyHash:
+          type: string
+        status:
+          $ref: '#/components/schemas/SourceStatus'
+        filterRules:
+          type: object
+          additionalProperties: true
+        type:
+          $ref: '#/components/schemas/SourceType'
+        schedule:
+          type: string
+          description: Pull interval (`30s`) or CRON; null/omitted for `push_rest`
+          nullable: true
+        parserConfig:
+          type: object
+          additionalProperties: true
+          description: Prometheus scrape targets and threshold rules; empty object for `push_rest`
 
   # --- Rules ---
     ProcessingRule:
@@ -3102,6 +3231,17 @@ components:
           type: array
           items:
             type: string
+        healthPercent:
+          type: integer
+          description: Server-computed product health 0–100 from `product_health_snapshot`
+        damagePercent:
+          type: integer
+          description: Server-computed damage used for heatmap intensity and Sankey width
+        components:
+          type: array
+          description: Component breakdown from the snapshot (code, percents)
+          items:
+            $ref: '#/components/schemas/ProductComponentHealth'
 
     ProductHealthDetail:
       allOf:
@@ -3120,6 +3260,94 @@ components:
               type: object
               additionalProperties:
                 type: integer
+            sankey:
+              $ref: '#/components/schemas/ProductHealthSankey'
+            calculatedAt:
+              type: string
+              format: date-time
+              description: Snapshot calculation time
+            minHealthToday:
+              type: integer
+              description: Minimum `healthPercent` in today's history buckets
+            maxHealthToday:
+              type: integer
+              description: Maximum `healthPercent` in today's history buckets
+
+    ProductComponentHealth:
+      type: object
+      required: [code, name, healthPercent, damagePercent]
+      properties:
+        code:
+          type: string
+          description: Slot code (POWER, CPU, HDD, AVAILABILITY, COMMON, …)
+        name:
+          type: string
+        healthPercent:
+          type: integer
+        damagePercent:
+          type: integer
+        weight:
+          type: integer
+        influenceType:
+          $ref: '#/components/schemas/InfluenceType'
+        ciIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    ProductHealthSankey:
+      type: object
+      required: [nodes, links]
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductHealthSankeyNode'
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductHealthSankeyLink'
+
+    ProductHealthSankeyNode:
+      type: object
+      required: [id, label]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        kind:
+          type: string
+          description: Node kind (product, component, ci, signal)
+
+    ProductHealthSankeyLink:
+      type: object
+      required: [from, to, damage]
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+        damage:
+          type: integer
+          description: Link width from server-computed damage
+
+    ProductHealthHistoryBucket:
+      type: object
+      required: [bucketStart, bucketMinutes, minHealth, maxHealth, worstSeverity]
+      properties:
+        bucketStart:
+          type: string
+          format: date-time
+        bucketMinutes:
+          type: integer
+        minHealth:
+          type: integer
+        maxHealth:
+          type: integer
+        worstSeverity:
+          $ref: '#/components/schemas/Severity'
 
     CiHealthProfile:
       type: object
@@ -3397,6 +3625,11 @@ components:
           items:
             type: string
             format: uuid
+        components:
+          type: array
+          description: Health slots (`product_component`) with CI assignments
+          items:
+            $ref: '#/components/schemas/ProductComponentAdmin'
 
     ProductCreate:
       type: object
@@ -3417,7 +3650,9 @@ components:
             type: string
         ciIds:
           type: array
-          description: Optional CI ids to link on create; each id must exist
+          description: |
+            Optional CI ids to link on create; each id must exist.
+            New CIs are also bound to `COMMON` (created if missing).
           items:
             type: string
             format: uuid
@@ -3443,6 +3678,65 @@ components:
           description: |
             When present, replaces all `product_ci` links for this product (empty array clears all).
             When omitted, CI membership is unchanged. Each id must exist.
+            Newly added CIs without a slot are bound to `COMMON`.
+          items:
+            type: string
+            format: uuid
+        components:
+          type: array
+          description: |
+            When present, replaces all health component slots for this product.
+            When omitted, slots are unchanged. At least one `weight` must be > 0.
+            A CI may appear in at most one slot of the same product.
+          items:
+            $ref: '#/components/schemas/ProductComponentPatch'
+
+    ProductComponentAdmin:
+      type: object
+      required: [id, code, name, weight, influenceType, ciIds]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        weight:
+          type: integer
+          minimum: 0
+          maximum: 100
+        influenceType:
+          $ref: '#/components/schemas/InfluenceType'
+        criticalThreshold:
+          type: integer
+          description: Threshold for `critical` influence (default 100)
+        ciIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    ProductComponentPatch:
+      type: object
+      required: [code, name, weight, influenceType]
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        weight:
+          type: integer
+          minimum: 0
+          maximum: 100
+        influenceType:
+          $ref: '#/components/schemas/InfluenceType'
+          description: Product health uses `weighted` or `critical` (`combo` is not applied)
+        criticalThreshold:
+          type: integer
+          description: Threshold for `critical` influence (default 100)
+        ciIds:
+          type: array
           items:
             type: string
             format: uuid

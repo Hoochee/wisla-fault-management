@@ -27,7 +27,7 @@
 
   <div class="heatmap-section">
     <div class="legend">
-      <span>Обзор:</span>
+      <span>Цвет = healthPercent:</span>
       @for (s of severities; track s) {
         <app-severity-badge [severity]="s" />
       }
@@ -42,13 +42,25 @@
             type="button"
             class="heat-cell"
             [class.selected]="selectedProductId === p.id"
-            [style.background-color]="getHeatColor(p.maxSeverity, p.activeEventCount)"
             (click)="selectProduct(p.id)"
           >
             <div class="name">{{ p.name }}</div>
             <div class="foot">
-              <app-severity-badge [severity]="p.maxSeverity" [compact]="true" />
-              <span class="count">{{ p.activeEventCount }}</span>
+              @if (historyFor(p.id).length) {
+                <div class="mini-heat">
+                  @for (b of historyFor(p.id); track b.bucketStart) {
+                    <span
+                      class="sq"
+                      [style.background-color]="getHealthPercentColor(b.minHealth)"
+                      [title]="b.bucketStart + ': ' + b.minHealth + '%'"
+                    ></span>
+                  }
+                </div>
+              }
+              <span
+                class="pct"
+                [attr.data-level]="p.healthPercent == null ? 'unknown' : percentToLevel(p.healthPercent)"
+              >{{ p.healthPercent ?? '—' }}%</span>
             </div>
           </button>
           @if (isAdmin()) {
@@ -61,6 +73,10 @@
       }
     </div>
   </div>
+
+  @if (selectedDetail) {
+    <app-monq-health-graph [product]="selectedDetail" />
+  }
 
   @if (selectedProduct) {
     <div class="operative">

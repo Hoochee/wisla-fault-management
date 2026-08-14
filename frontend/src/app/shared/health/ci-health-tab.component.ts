@@ -52,6 +52,8 @@ import { SeverityBadgeComponent } from '../severity-badge/severity-badge.compone
                   <td class="num">{{ c.damageFromComponents }}%</td>
                   <td class="num">{{ c.damageFromInfluence }}%</td>
                 </tr>
+              } @empty {
+                <tr><td colspan="4" class="empty">Нет данных компонентов</td></tr>
               }
             </tbody>
           </table>
@@ -89,7 +91,9 @@ import { SeverityBadgeComponent } from '../severity-badge/severity-badge.compone
         </div>
       }
 
-      <app-health-timeline-chart [timeline]="health.timeline" />
+      @if (health.timeline.length) {
+        <app-health-timeline-chart [timeline]="health.timeline" />
+      }
 
       @if (rcaOpen) {
         <div class="rca-panel">
@@ -130,7 +134,7 @@ import { SeverityBadgeComponent } from '../severity-badge/severity-badge.compone
   styles: [
     `
       .root { display: flex; flex-direction: column; gap: 1rem; }
-      .card { background: #252830; border: 1px solid #3a3f4b; border-radius: 8px; padding: 1rem; }
+      .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
       .summary { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
       .summary-main { display: flex; gap: 1rem; align-items: flex-start; }
       .percent-box {
@@ -141,41 +145,41 @@ import { SeverityBadgeComponent } from '../severity-badge/severity-badge.compone
       .percent-box[data-level='warning'] { border-color: #eab308; background: rgba(234,179,8,0.12); color: #eab308; }
       .percent-box[data-level='major'] { border-color: #ea580c; background: rgba(234,88,12,0.12); color: #ea580c; }
       .percent-box[data-level='fatal'], .percent-box[data-level='critical'] { border-color: #dc2626; background: rgba(220,38,38,0.12); color: #dc2626; }
-      .label { font-size: 0.75rem; color: #6b7280; margin-bottom: 0.25rem; }
-      .fqdn { font-family: var(--font-mono); font-size: 0.875rem; color: #d1d5db; margin-top: 0.5rem; }
-      .meta { font-size: 0.75rem; color: #6b7280; }
+      .label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem; }
+      .fqdn { font-family: var(--font-mono); font-size: 0.875rem; color: var(--text-primary); margin-top: 0.5rem; }
+      .meta { font-size: 0.75rem; color: var(--text-muted); }
       .summary-side { display: flex; gap: 1.5rem; align-items: flex-start; font-size: 0.875rem; }
       .rca-btn {
         padding: 0.375rem 0.75rem; font-size: 0.75rem; border-radius: 6px; cursor: pointer;
-        background: #1a1d23; border: 1px solid #3a3f4b; color: #d1d5db;
+        background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary);
       }
-      .rca-btn.open { background: rgba(74,158,255,0.2); border-color: #4a9eff; color: #4a9eff; }
+      .rca-btn.open { background: var(--nav-hover); border-color: var(--accent); color: var(--accent); }
       .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; }
       @media (max-width: 1200px) { .grid { grid-template-columns: 1fr; } }
-      h3 { margin: 0 0 0.75rem; font-size: 0.875rem; color: #fff; font-weight: 500; }
+      h3 { margin: 0 0 0.75rem; font-size: 0.875rem; color: var(--text-primary); font-weight: 500; }
       table { width: 100%; font-size: 0.875rem; border-collapse: collapse; }
-      th, td { padding: 0.5rem 0; border-bottom: 1px solid rgba(58,63,75,0.5); text-align: left; }
-      th { font-size: 0.75rem; color: #6b7280; font-weight: 400; }
-      .num { text-align: right; color: #9ca3af; }
+      th, td { padding: 0.5rem 0; border-bottom: 1px solid var(--border); text-align: left; }
+      th { font-size: 0.75rem; color: var(--text-muted); font-weight: 400; }
+      .num { text-align: right; color: var(--text-secondary); }
       .signals-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
       .signals-head h3 { margin: 0; }
-      .count { font-size: 1.125rem; font-weight: 700; color: #fff; }
+      .count { font-size: 1.125rem; font-weight: 700; color: var(--text-primary); }
       .signal-row { display: flex; justify-content: space-between; font-size: 0.875rem; margin-bottom: 0.5rem; }
-      .link { display: block; margin-top: 1rem; text-align: center; font-size: 0.75rem; color: #4a9eff; text-decoration: none; }
-      .dependent { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; background: #1a1d23; border: 1px solid #3a3f4b; border-radius: 6px; margin-bottom: 0.5rem; }
+      .link { display: block; margin-top: 1rem; text-align: center; font-size: 0.75rem; color: var(--accent); text-decoration: none; }
+      .dependent { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 0.5rem; }
       .icon { font-size: 1rem; }
       .dep-main { flex: 1; min-width: 0; }
       .rca-panel {
-        position: fixed; inset: auto 0 0 0; z-index: 40; background: #1a1d23; border-top: 1px solid #3a3f4b;
-        box-shadow: 0 -8px 24px rgba(0,0,0,0.4); max-height: 50vh; display: flex; flex-direction: column;
+        position: fixed; inset: auto 0 0 0; z-index: 40; background: var(--bg-card); border-top: 1px solid var(--border);
+        box-shadow: 0 -8px 24px rgba(28,31,38,0.12); max-height: 50vh; display: flex; flex-direction: column;
       }
-      .rca-head { display: flex; justify-content: space-between; padding: 0.75rem 1rem; border-bottom: 1px solid #3a3f4b; }
-      .rca-head h3 { margin: 0; font-size: 0.875rem; color: #fff; }
-      .close { background: none; border: none; color: #6b7280; font-size: 1.25rem; cursor: pointer; }
-      .rca-toolbar { padding: 0.75rem 1rem; border-bottom: 1px solid #3a3f4b; font-size: 0.75rem; color: #9ca3af; }
-      .rca-toolbar input { margin-left: 0.5rem; width: 4rem; padding: 0.25rem 0.5rem; background: #252830; border: 1px solid #3a3f4b; border-radius: 4px; color: #fff; }
+      .rca-head { display: flex; justify-content: space-between; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
+      .rca-head h3 { margin: 0; font-size: 0.875rem; color: var(--text-primary); }
+      .close { background: none; border: none; color: var(--text-muted); font-size: 1.25rem; cursor: pointer; }
+      .rca-toolbar { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.75rem; color: var(--text-secondary); }
+      .rca-toolbar input { margin-left: 0.5rem; width: 4rem; padding: 0.25rem 0.5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); }
       .rca-body { flex: 1; overflow: auto; padding: 0.5rem 1rem; }
-      .empty { text-align: center; color: #6b7280; padding: 1rem; }
+      .empty { text-align: center; color: var(--text-muted); padding: 1rem; }
       .damage { color: #dc2626; }
     `,
   ],

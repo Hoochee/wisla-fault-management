@@ -36,15 +36,15 @@ import { HealthBadgeComponent } from './health-badge.component';
   `,
   styles: [
     `
-      .panel { background: #252830; border: 1px solid #3a3f4b; border-radius: 8px; padding: 1rem; }
+      .panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
       .head { display: flex; justify-content: space-between; margin-bottom: 0.75rem; }
-      h3 { margin: 0; font-size: 0.875rem; color: #fff; font-weight: 500; }
-      .hint { font-size: 0.75rem; color: #6b7280; }
+      h3 { margin: 0; font-size: 0.875rem; color: var(--text-primary); font-weight: 500; }
+      .hint { font-size: 0.75rem; color: var(--text-muted); }
       .chart { display: flex; align-items: flex-end; gap: 0.25rem; height: 8rem; }
       .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.25rem; min-width: 0; }
       .bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 4px; }
-      .time { font-size: 9px; color: #6b7280; text-align: center; width: 100%; overflow: hidden; text-overflow: ellipsis; }
-      .footer { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #3a3f4b; }
+      .time { font-size: 9px; color: var(--text-muted); text-align: center; width: 100%; overflow: hidden; text-overflow: ellipsis; }
+      .footer { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); }
     `,
   ],
 })
@@ -60,6 +60,6 @@ export class HealthTimelineChartComponent {
     if (level === 'major') return '#ea580c';
     if (level === 'warning') return '#eab308';
     if (level === 'ok') return '#22c55e';
-    return '#6b7280';
+    return 'var(--text-muted)';
   }
 }

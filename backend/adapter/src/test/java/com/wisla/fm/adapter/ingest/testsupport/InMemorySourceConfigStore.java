@@ -27,6 +27,11 @@ public final class InMemorySourceConfigStore implements SourceConfigLookupPort, 
     }
 
     @Override
+    public List<SourceConfig> findAll() {
+        return all();
+    }
+
+    @Override
     public Optional<SourceConfig> findBySourceKey(String sourceKey) {
         return bySourceId.values().stream()
                 .filter(config -> config.sourceKey().equals(sourceKey))
@@ -52,7 +57,10 @@ public final class InMemorySourceConfigStore implements SourceConfigLookupPort, 
                         config.blocked(),
                         config.ttlExpiresAt(),
                         existing.createdAt(),
-                        config.updatedAt()
+                        config.updatedAt(),
+                        config.type(),
+                        config.schedule(),
+                        config.parserConfig()
                 );
         bySourceId.put(stored.sourceId(), stored);
     }

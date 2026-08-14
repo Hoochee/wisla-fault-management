@@ -38,6 +38,7 @@ wisla:
     buffer-retry-interval-ms: ${BUFFER_RETRY_INTERVAL_MS:60000}
     fm-module-health-check-enabled: ${FM_MODULE_HEALTH_CHECK:true}
     config-sync-interval-ms: ${CONFIG_SYNC_INTERVAL_MS:300000}
+    pull-etl-interval-ms: ${PULL_ETL_INTERVAL_MS:1000}
   kafka:
     raw-events-topic: ${KAFKA_RAW_EVENTS_TOPIC:fm.raw-events}
 

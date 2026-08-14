@@ -24,7 +24,7 @@ import { PageHeaderComponent } from '../../shared/page-header/page-header.compon
       .hub-card { display: flex; flex-direction: column; gap: 0.5rem; padding: 1.25rem; background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 8px; text-decoration: none; transition: border-color 0.15s; }
       .hub-card:hover { border-color: var(--accent); }
       .icon { font-size: 1.5rem; }
-      .title { color: #fff; font-weight: 500; font-size: 0.9375rem; }
+      .title { color: var(--text-primary); font-weight: 500; font-size: 0.9375rem; }
       .desc { color: var(--text-muted); font-size: 0.75rem; }
     `,
   ],

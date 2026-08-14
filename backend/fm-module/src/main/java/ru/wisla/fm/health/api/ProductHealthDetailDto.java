@@ -3,6 +3,7 @@ package ru.wisla.fm.health.api;
 import ru.wisla.fm.admin.api.ConfigurationItemDto;
 import ru.wisla.fm.processing.api.EventDto;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -16,26 +17,15 @@ public record ProductHealthDetailDto(
         int activeEventCount,
         List<UUID> ciIds,
         List<String> tags,
+        int healthPercent,
+        int damagePercent,
+        List<ComponentHealthDto> components,
+        SankeyDto sankey,
         List<ConfigurationItemDto> configurationItems,
         List<EventDto> activeEvents,
-        Map<String, Integer> severityBreakdown
+        Map<String, Integer> severityBreakdown,
+        Instant calculatedAt,
+        Integer minHealthToday,
+        Integer maxHealthToday
 ) {
-    public static ProductHealthDetailDto from(ProductHealthDto health,
-                                              List<ConfigurationItemDto> configurationItems,
-                                              List<EventDto> activeEvents,
-                                              Map<String, Integer> severityBreakdown) {
-        return new ProductHealthDetailDto(
-                health.id(),
-                health.name(),
-                health.tenant(),
-                health.site(),
-                health.maxSeverity(),
-                health.activeEventCount(),
-                health.ciIds(),
-                health.tags(),
-                configurationItems,
-                activeEvents,
-                severityBreakdown
-        );
-    }
 }

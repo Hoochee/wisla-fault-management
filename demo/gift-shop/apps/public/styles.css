@@ -1,0 +1,81 @@
+:root {
+  color-scheme: light;
+  --ink: #1c1917;
+  --muted: #78716c;
+  --paper: #faf7f2;
+  --card: #ffffff;
+  --accent: #b45309;
+  --line: #e7e5e4;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+}
+h1 { margin: 0; font-size: 1.4rem; }
+.lede { margin: 1rem 1.5rem; color: var(--muted); }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+  padding: 0 1.5rem 2rem;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.emoji { font-size: 2rem; }
+.price { font-weight: 600; }
+button {
+  background: var(--accent);
+  color: white;
+  border: 0;
+  border-radius: 8px;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+}
+aside {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(360px, 100%);
+  height: 100%;
+  background: var(--card);
+  border-left: 1px solid var(--line);
+  padding: 1rem 1.25rem;
+  overflow: auto;
+}
+aside[hidden] { display: none; }
+#cart-items { list-style: none; padding: 0; }
+#cart-items li { display: flex; justify-content: space-between; margin: 0.4rem 0; }
+label { display: flex; flex-direction: column; gap: 0.3rem; margin: 0.8rem 0; }
+input { padding: 0.4rem; border: 1px solid var(--line); border-radius: 6px; }
+#checkout-result { min-height: 1.4rem; color: var(--muted); }
+.chaos {
+  margin: 0 1.5rem 1.25rem;
+  padding: 1rem 1.1rem;
+  background: var(--card);
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+}
+.chaos h2 { margin: 0 0 0.35rem; font-size: 1rem; }
+.chaos-hint { margin: 0 0 0.75rem; color: var(--muted); font-size: 0.9rem; }
+.chaos-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.chaos-row button { background: #44403c; }
+.chaos-row .chaos-reset { background: var(--accent); }
+.chaos-status { margin: 0.7rem 0 0; min-height: 1.2rem; color: var(--muted); font-size: 0.9rem; }

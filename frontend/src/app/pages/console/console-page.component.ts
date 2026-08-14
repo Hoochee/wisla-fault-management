@@ -219,7 +219,7 @@ import {
 
       .map-btn { display: block; width: 100%; text-align: left; padding: 0.5rem; background: none; border: none; color: var(--text-secondary); font-size: 0.8125rem; border-radius: 4px; cursor: pointer; }
 
-      .map-btn:hover, .map-btn.active { background: rgba(74,158,255,0.12); color: var(--accent); }
+      .map-btn:hover, .map-btn.active { background: rgba(47,111,237,0.12); color: var(--accent); }
 
       .map-btn.add { color: var(--accent); margin-top: 0.5rem; }
 
@@ -227,7 +227,7 @@ import {
 
       .console-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
 
-      .console-header h1 { margin: 0; font-size: 1.125rem; color: #fff; }
+      .console-header h1 { margin: 0; font-size: 1.125rem; color: var(--text-primary); }
 
       .poll-hint { margin: 0.25rem 0 0; font-size: 0.75rem; color: var(--text-muted); }
 
@@ -245,9 +245,9 @@ import {
 
       .data-table tr { cursor: pointer; }
 
-      .data-table tr:hover { background: rgba(74,158,255,0.05); }
+      .data-table tr:hover { background: rgba(47,111,237,0.05); }
 
-      .data-table tr.selected { background: rgba(74,158,255,0.1); }
+      .data-table tr.selected { background: rgba(47,111,237,0.1); }
 
       .mono { font-family: var(--font-mono); font-size: 0.6875rem; }
 

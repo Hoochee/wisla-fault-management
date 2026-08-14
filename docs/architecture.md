@@ -25,7 +25,7 @@
 
 | Deployable | Путь | Роль |
 |------------|------|------|
-| **adapter** | `backend/adapter/` | Приём Push, предфильтрация, буфер, heartbeat; проксирование в fm-module |
+| **adapter** | `backend/adapter/` | Приём Push, HTTP pull Prometheus (`pull_etl`), предфильтрация, буфер, heartbeat; публикация в Kafka `fm.raw-events` → fm-module |
 | **zabbix-simulator** | `backend/zabbix-simulator/` | MVP: имитация Zabbix 6.x webhook для демо-сценариев |
 | **fm-module** | `backend/fm-module/` + `frontend/` | Ingestion API, движок обработки, PostgreSQL, REST для UI, раздача SPA |
 
@@ -38,7 +38,7 @@
 | **rules** | `.../rules` | `ProcessingRule`, конструктор (canvas JSON), согласование |
 | **configuration** | `.../configuration` | `EventSource`, API-ключи, тест подключения, статус адаптера |
 | **cmdb** | `.../cmdb` | `ConfigurationItem`, автосоздание по FQDN, теги, продукты |
-| **health** | `.../health` | `ProductHealth` (read-model), тепловая карта, drill-down |
+| **health** | `ru.wisla.fm.health` (ADR-001) | Расчёт Monq без combo, `ProductComponent`, snapshot/history, REST `/api/v1/health/*`; остаётся BC **внутри** fm-module (выделение сервиса — backlog) |
 | **identity** | `.../identity` | `User`, `Role`, JWT, `EventMap` (карты консоли), консоли доступа (post-MVP) |
 | **settings** | `.../settings` | Параметры модуля, TZ, polling; интеграции и оповещения (post-MVP) |
 | **downtime** | `.../downtime` | `Downtime`, подавление оповещений (post-MVP) |
@@ -80,6 +80,7 @@ flowchart TB
 
     subgraph ad_deploy [adapter :8081]
         PUSH[Push REST webhook]
+        PULL[PullEtlScheduler scrape /metrics]
         FILT[Предфильтрация]
         BUF[Локальный буфер]
         HB[Heartbeat]
@@ -92,12 +93,15 @@ flowchart TB
 
     SRC -->|webhook| PUSH
     ZSIM -->|Zabbix JSON webhook| PUSH
+    PULL -.->|Kafka fm.raw-events| ING
     BUF -->|HTTPS sync| ING
     UI -->|/api/v1/* + static| BFF
     BFF --> PG_FM
     BUF --> PG_AD
     CFG -.->|конфиг источника| FILT
 ```
+
+Push webhook по-прежнему идёт в adapter. `PullEtlScheduler` (только `type=pull_etl`) делает HTTP GET Prometheus `/metrics` и публикует PROBLEM/OK в **тот же** Kafka topic `fm.raw-events` (не `POST /api/v1/ingest`). Топология ingest не меняется: **adapter → Kafka → fm-module**.
 
 ### 2.2. Production (Kafka + ClickHouse)
 
@@ -109,6 +113,7 @@ flowchart TB
     subgraph adapter_cluster [adapter cluster]
         AD1[adapter]
         AD2[adapter ...]
+        PULL[PullEtlScheduler]
     end
 
     K{{Apache Kafka}}
@@ -120,9 +125,12 @@ flowchart TB
     PG[(PostgreSQL wisla_fm)]
     CH[(ClickHouse history)]
     EXT[Внешние источники]
+    METRICS[Prometheus /metrics]
 
     EXT --> AD1
     EXT --> AD2
+    METRICS -->|HTTP GET| PULL
+    PULL -->|publish fm.raw-events| K
     AD1 -->|publish| K
     AD2 -->|publish| K
     K --> W1 --> W2
@@ -141,7 +149,7 @@ flowchart TB
 
 | Сервис | Bounded Context (верхний уровень) | База данных | Основные агрегаты | Страницы UI |
 |--------|-----------------------------------|-------------|-------------------|-------------|
-| **adapter** | Ingest & Buffer | `wisla_fm_adapter` (минимальная) | `BufferedMessage`, `AdapterHeartbeat`, `SourceConfigSnapshot` | — (runtime для `/sources/*`; UI в fm-module) |
+| **adapter** | Ingest & Buffer | `wisla_fm_adapter` (минимальная) | `BufferedMessage`, `AdapterHeartbeat`, `SourceConfigSnapshot`, `PullMetricState` | — (runtime для `/sources/*`; UI в fm-module) |
 | **fm-module** | FM Core (ingestion + processing + configuration + cmdb + rules + health + identity + settings + downtime) | `wisla_fm` | см. таблицу 3.2 | все маршруты из `pages-spec.md` |
 
 ### 3.2. Агрегаты и страницы по контекстам (`fm-module`)
@@ -149,7 +157,7 @@ flowchart TB
 | Контекст | Агрегаты (корень) | Связанные сущности | Маршруты |
 |----------|-------------------|--------------------|----------|
 | **identity** | `User`, `Role` | permissions, team, session | `/login`, `/admin`, `/admin/users`, `/admin/roles`, `/admin/consoles` (post-MVP), профиль в `/settings` |
-| **health** | `Product` (read-model) | агрегаты по `ci_id`, severity counters | `/`, `/health`, `/health/:productId` |
+| **health** | `Product` (read-model) + `ProductComponent` | `product_health_snapshot`, `product_health_history`, Sankey/heatmap REST | `/`, `/health`, `/health/:productId` |
 | **ingestion** | `RawEvent` | привязка к `source_id`, payload JSON | `/events/raw` |
 | **processing** | `Event` | `EventActionLog`, `EventHistory` (post-MVP), root/child links | `/console`, `/console/:eventId` |
 | **configuration** | `EventSource` | `credentials_ref`, `filter_rules`, adapter status | `/sources`, `/sources/new`, `/sources/:id` |
@@ -200,7 +208,8 @@ flowchart TB
 | Направление | Механизм MVP | Механизм Prod | Данные |
 |-------------|--------------|---------------|--------|
 | adapter → fm-module | `POST /api/v1/ingest?sourceKey={key}` (sync HTTPS) | Publish в Kafka topic `fm.raw-events` | Нормализуемый JSON события, batch, heartbeat |
-| fm-module → adapter | `GET /api/v1/internal/sources/{id}/config` (pull кэша) | То же + domain event `SourceConfigChanged` | `source_id`, `filter_rules`, `api_key` hash, endpoint |
+| adapter pull → Kafka | `PullEtlScheduler` scrape → `RawEventPublisherPort` | То же, topic `fm.raw-events` (без смены envelope) | PROBLEM/OK только при смене severity; не `POST /ingest` |
+| fm-module → adapter | `GET /api/v1/internal/sources` (+ `{id}/config`) | То же + domain event `SourceConfigChanged` | `source_id`, `filter_rules`, `api_key` hash, `type`, `schedule`, `parserConfig` |
 | UI тест источника | fm-module оркестрирует probe через adapter | То же | Результат success/fail в `EventSource.last_success_at` |
 
 ### 4.2. Логические ссылки внутри fm-module (без кросс-сервисных FK)
@@ -221,7 +230,8 @@ flowchart TB
 | Таблица | Назначение |
 |---------|------------|
 | `buffered_messages` | Очередь при недоступности fm-module; retry по расписанию |
-| `source_config_snapshots` | Кэш `source_id`, `api_key`, `filter_rules` с TTL |
+| `source_config_snapshots` | Кэш `source_id`, `api_key`, `filter_rules`, `source_type`, `schedule`, `parser_config` с TTL |
+| `pull_metric_states` | Последняя severity/value scrape; PK `(source_id, external_id)` |
 | `adapter_heartbeats` | Исходящие heartbeat-записи (audit локально) |
 
 ### 4.4. Внешние интеграции (post-MVP, из fm-module)
@@ -231,6 +241,21 @@ flowchart TB
 | WISLA | fm-module → WISLA | `external_ids` на КЕ, маппинг event id |
 | ITSM | fm-module ↔ ITSM | `itsm_incident_number` на Event (MVP — поле-заглушка) |
 | Active Directory | AD → fm-module | `users.external_id`, группы → роли |
+
+### 4.5. Product health graph (без смены ingest topology)
+
+Health остаётся bounded context в **fm-module** (`ru.wisla.fm.health`, ADR-001). Новый deployable не добавляется. Ingest по-прежнему **adapter → Kafka `fm.raw-events` → fm-module** (webhook path и envelope `schemaVersion = 1` не меняются).
+
+```text
+SPA ──REST JWT──► fm-module :8080  /api/v1/health/*  /api/v1/admin/products
+Prometheus /metrics ──HTTP GET──► adapter :8081 PullEtlScheduler
+adapter ──Kafka fm.raw-events──► fm-module ingestion consumer
+fm-module ──GET /api/v1/internal/sources (X-Service-Key)──► adapter sync
+processing EventCreated/Updated/Closed (in-process) ──► health RecalculateProductHealth
+HealthRecalcScheduler (5 мин) ──► полный пересчёт snapshot
+```
+
+Пересчёт пишет `product_health_snapshot` / `product_health_history` и копирует `max_severity` / `active_event_count` на `products`.
 
 ---
 
@@ -251,14 +276,14 @@ flowchart TB
 
 | Событие | Издатель | Подписчики | Назначение |
 |---------|----------|------------|------------|
-| `EventCreated` | processing | health (read-model), rules engine | Новое FM-событие после нормализации |
-| `EventUpdated` | processing | health, UI polling clients | Смена severity, status, assignment |
+| `EventCreated` | processing | health (`EventLifecycleHealthListener`), rules engine | Новое FM-событие → `RecalculateProductHealth` для продуктов через `product_ci` |
+| `EventUpdated` | processing | health, UI polling clients | Смена severity/status → пересчёт snapshot |
 | `EventDeduplicated` | rules | processing, action log | `repeat_count`, `last_repeat_at` |
 | `EventCorrelated` | rules | processing | `root_event_id`, `child_event_ids` |
-| `EventClosed` | processing | health, ITSM stub | Закрытие ЖЦ |
+| `EventClosed` | processing | health, ITSM stub | Закрытие ЖЦ → пересчёт snapshot |
 | `OperatorActionRecorded` | processing | — | Запись в `event_action_logs` |
 | `CiAutoCreated` | cmdb | processing | Новый КЕ по FQDN при ingest |
-| `ProductHealthRecalculated` | health | — | Обновление тепловой карты |
+| `ProductHealthRecalculated` | health | — | Upsert snapshot/history; копия counters на `products` |
 | `RuleApproved` | rules | rules engine | Активация правила корреляции |
 | `DowntimeActivated` | downtime | processing | Статус «Обслуживание» (post-MVP) |
 | `DowntimeCompleted` | downtime | processing, notifications | Возврат событий, автозапуск оповещений (post-MVP) |
@@ -267,7 +292,7 @@ flowchart TB
 
 | Topic | Producer | Consumer | Payload |
 |-------|----------|----------|---------|
-| `fm.raw-events` | adapter | fm-module ingestion | Raw ingest DTO |
+| `fm.raw-events` | adapter (push webhook и pull scrape) | fm-module ingestion | Raw ingest DTO (`RawEventEnvelope`); pull не меняет topic/envelope |
 | `fm.config-events` | fm-module | adapter | `SourceConfigChanged`, `SourceBlocked` |
 | `fm.domain-events` | fm-module | ClickHouse sink, analytics | `Event*`, `OperatorActionRecorded` |
 
@@ -303,6 +328,9 @@ flowchart LR
 | Polling консоли | `GET /api/v1/events` |
 | Принять в работу | `POST /api/v1/events/{id}/actions` |
 | Тепловая карта | `GET /api/v1/health/products` |
+| Карточка продукта / Sankey | `GET /api/v1/health/products/{id}` |
+| Heatmap истории | `GET /api/v1/health/products/{id}/history` |
+| Веса компонентов | `PATCH /api/v1/admin/products/{id}` (`components`) |
 | Список источников | `GET /api/v1/sources` |
 | Тест источника | `POST /api/v1/sources/{id}/test` |
 | Карты событий | `GET /api/v1/console/maps` |
@@ -313,7 +341,8 @@ flowchart LR
 |----------|----------|
 | Порт MVP | **8081** |
 | Публичный webhook | `{adapterBase}/webhook/{sourceKey}` — приём от Zabbix/AlertManager |
-| Исходящий вызов | `{fmModuleBase}/api/v1/ingest?sourceKey={key}` |
+| Исходящий вызов (push buffer) | `{fmModuleBase}/api/v1/ingest?sourceKey={key}` |
+| Pull ETL | scrape `parserConfig.targets` → Kafka `fm.raw-events` (не `POST /api/v1/ingest`) |
 
 ### 6.3. Production — эволюция BFF
 
@@ -342,8 +371,8 @@ JWT и матрица ролей (`pages-spec.md`) применяются на �
 
 ```
 backend/
-  adapter/                 # Spring Boot — Push, буфер, heartbeat
-  fm-module/               # Spring Boot — API, processing, Liquibase, static Angular
+  adapter/                 # Spring Boot — Push, pull Prometheus, буфер, heartbeat, Kafka
+  fm-module/               # Spring Boot — API, processing, health BC, Liquibase, static Angular
 frontend/                  # Angular 18+ → build в fm-module resources
 docs/
   architecture.md          # этот документ

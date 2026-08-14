@@ -2,6 +2,7 @@ package com.wisla.fm.adapter.ingest.application.port.out;
 
 import com.wisla.fm.adapter.ingest.domain.SourceConfig;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -15,4 +16,6 @@ public interface SourceConfigLookupPort {
     Optional<SourceConfig> findBySourceKey(String sourceKey);
 
     Optional<SourceConfig> findBySourceId(UUID sourceId);
+
+    List<SourceConfig> findAll();
 }

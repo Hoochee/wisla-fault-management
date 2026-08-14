@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gift Shop</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Gift Shop</h1>
+    <button id="cart-toggle" type="button">Cart (<span id="cart-count">0</span>)</button>
+  </header>
+  <main>
+    <p class="lede">Small gifts. Mock payment. Observed by WISLA FM through adapter pull — this shop never talks to FM.</p>
+    <section class="chaos" aria-label="Chaos demo">
+      <h2>Chaos</h2>
+      <p class="chaos-hint">Кнопки портят <code>/metrics</code> выбранного сервиса. Через ~30 с adapter откроет сигнал в FM.</p>
+      <div class="chaos-row">
+        <button type="button" data-chaos data-target="checkout" data-kind="down">Checkout down</button>
+        <button type="button" data-chaos data-target="catalog" data-kind="cpu" data-value="0.96">Catalog CPU 96%</button>
+        <button type="button" data-chaos data-target="checkout" data-kind="disk" data-value="0.96">Checkout disk 96%</button>
+        <button type="button" data-chaos data-target="catalog" data-kind="latency" data-latency="2000">Catalog latency 2s</button>
+        <button type="button" data-chaos data-target="storefront" data-kind="down">Storefront down</button>
+        <button type="button" data-chaos data-target="all" data-kind="reset" class="chaos-reset">Reset all</button>
+      </div>
+      <p id="chaos-status" class="chaos-status"></p>
+    </section>
+    <section id="catalog" class="grid" aria-live="polite"></section>
+  </main>
+  <aside id="cart" hidden>
+    <h2>Cart</h2>
+    <ul id="cart-items"></ul>
+    <p id="cart-total"></p>
+    <form id="checkout-form">
+      <label>Name <input name="customerName" required maxlength="80" placeholder="Alex" /></label>
+      <button type="submit">Pay (mock)</button>
+    </form>
+    <p id="checkout-result"></p>
+  </aside>
+  <script src="/app.js"></script>
+</body>
+</html>

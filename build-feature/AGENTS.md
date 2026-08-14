@@ -13,6 +13,6 @@
 | 10 | [.agents/10-frontend-engineer.md](../.agents/10-frontend-engineer.md) | Angular 18 SPA | `frontend/` |
 | 11 | [.agents/11-frontend-test-engineer.md](../.agents/11-frontend-test-engineer.md) | Vitest + Playwright e2e (оба обязательны) | `npm test`, `npm run test:e2e` |
 
-Документация: [SKILL.core.md](SKILL.core.md) · [orchestrator-playbook.md](orchestrator-playbook.md)
+Документация: [SKILL.core.md](SKILL.core.md) · [orchestrator-playbook.md](orchestrator-playbook.md) · беклог: [`BACKLOG.md`](../BACKLOG.md)
 
 Не используются (greenfield-only): 02-tech-advisor, 03-prototype-designer, 04-prototype-reviewer, 06-api-designer.

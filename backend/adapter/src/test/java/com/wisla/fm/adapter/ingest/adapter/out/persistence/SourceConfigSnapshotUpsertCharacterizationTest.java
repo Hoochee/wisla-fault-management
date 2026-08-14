@@ -63,6 +63,28 @@ class SourceConfigSnapshotUpsertCharacterizationTest {
     }
 
     @Test
+    void replaceOverwritesPullEtlFields() {
+        SourceConfigSnapshotJpaEntity snapshot = SourceConfigSnapshotJpaEntity.createEmpty();
+        snapshot.replace(
+                UUID.randomUUID(),
+                "giftshop-metrics",
+                "hash",
+                "http://fm-module:8080",
+                Map.of(),
+                false,
+                FIRST_SYNC.plusSeconds(86_400),
+                FIRST_SYNC,
+                "pull_etl",
+                "30s",
+                Map.of("rules", Map.of("metric", "up"))
+        );
+
+        assertThat(snapshot.getSourceType()).isEqualTo("pull_etl");
+        assertThat(snapshot.getSchedule()).isEqualTo("30s");
+        assertThat(snapshot.getParserConfig()).containsKey("rules");
+    }
+
+    @Test
     void nullFilterRulesBecomeAnEmptyMap() {
         SourceConfigSnapshotJpaEntity snapshot = SourceConfigSnapshotJpaEntity.createEmpty();
 

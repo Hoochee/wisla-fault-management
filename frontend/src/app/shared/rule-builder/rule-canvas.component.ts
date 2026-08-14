@@ -31,11 +31,11 @@ const DRAG_THRESHOLD = 4;
       <svg class="edges">
         @for (c of connections; track c.from + c.to) {
           @if (edgePath(c); as d) {
-            <path [attr.d]="d" fill="none" stroke="#4a9eff" stroke-width="2" opacity="0.7" />
+            <path [attr.d]="d" fill="none" stroke="var(--accent)" stroke-width="2" opacity="0.7" />
           }
         }
         @if (linkPath(); as d) {
-          <path [attr.d]="d" fill="none" stroke="#4a9eff" stroke-width="2" stroke-dasharray="6 4" />
+          <path [attr.d]="d" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 4" />
         }
       </svg>
 
@@ -80,8 +80,8 @@ const DRAG_THRESHOLD = 4;
     `
       .canvas {
         position: relative;
-        background: #1a1d23;
-        border: 1px solid #3a3f4b;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
         border-radius: 8px;
         overflow: hidden;
         user-select: none;
@@ -89,7 +89,7 @@ const DRAG_THRESHOLD = 4;
         height: 480px;
       }
       .canvas.linking {
-        border-color: rgba(74, 158, 255, 0.6);
+        border-color: rgba(47, 111, 237, 0.6);
       }
       .edges {
         position: absolute;
@@ -118,52 +118,52 @@ const DRAG_THRESHOLD = 4;
         cursor: grabbing;
       }
       .block.selected {
-        box-shadow: 0 0 0 2px #4a9eff;
+        box-shadow: 0 0 0 2px var(--accent);
       }
       .block[data-type='trigger'] {
-        background: rgba(74, 158, 255, 0.2);
-        border-color: #4a9eff;
-        color: #4a9eff;
+        background: rgba(47, 111, 237, 0.12);
+        border-color: var(--accent);
+        color: var(--accent);
       }
       .block[data-type='condition'] {
         background: rgba(245, 158, 11, 0.1);
         border-color: rgba(245, 158, 11, 0.5);
-        color: #fcd34d;
+        color: #b45309;
       }
       .block[data-type='switch'] {
         background: rgba(168, 85, 247, 0.1);
         border-color: rgba(168, 85, 247, 0.5);
-        color: #d8b4fe;
+        color: #7c3aed;
       }
       .block[data-type='dedup'] {
         background: rgba(34, 197, 94, 0.1);
         border-color: rgba(34, 197, 94, 0.5);
-        color: #86efac;
+        color: #15803d;
       }
       .block[data-type='threshold'] {
         background: rgba(249, 115, 22, 0.1);
         border-color: rgba(249, 115, 22, 0.5);
-        color: #fdba74;
+        color: #c2410c;
       }
       .block[data-type='correlation'] {
         background: rgba(236, 72, 153, 0.1);
         border-color: rgba(236, 72, 153, 0.5);
-        color: #f9a8d4;
+        color: #be185d;
       }
       .block[data-type='notify'] {
         background: rgba(20, 184, 166, 0.1);
         border-color: rgba(20, 184, 166, 0.5);
-        color: #5eead4;
+        color: #0f766e;
       }
       .block[data-type='push'] {
         background: rgba(99, 102, 241, 0.1);
         border-color: rgba(99, 102, 241, 0.5);
-        color: #a5b4fc;
+        color: #4338ca;
       }
       .block[data-type='status'] {
         background: rgba(59, 130, 246, 0.1);
         border-color: rgba(59, 130, 246, 0.5);
-        color: #93c5fd;
+        color: #1d4ed8;
       }
       .type {
         font-size: 0.625rem;
@@ -183,8 +183,8 @@ const DRAG_THRESHOLD = 4;
         width: 1rem;
         height: 1rem;
         border-radius: 50%;
-        border: 2px solid #6b7280;
-        background: #1a1d23;
+        border: 2px solid var(--text-muted);
+        background: var(--bg-card);
         z-index: 2;
         padding: 0;
       }
@@ -193,8 +193,8 @@ const DRAG_THRESHOLD = 4;
         pointer-events: none;
       }
       .port-in.highlight {
-        border-color: #4a9eff;
-        background: rgba(74, 158, 255, 0.3);
+        border-color: var(--accent);
+        background: rgba(47, 111, 237, 0.3);
         transform: translateX(-50%) scale(1.25);
       }
       .port-out {
@@ -202,8 +202,8 @@ const DRAG_THRESHOLD = 4;
         cursor: crosshair;
       }
       .port-out.active {
-        border-color: #4a9eff;
-        background: #4a9eff;
+        border-color: var(--accent);
+        background: var(--accent);
         transform: translateX(-50%) scale(1.25);
       }
       .hint {
@@ -214,11 +214,11 @@ const DRAG_THRESHOLD = 4;
         display: flex;
         justify-content: space-between;
         font-size: 0.625rem;
-        color: #6b7280;
+        color: var(--text-muted);
         pointer-events: none;
       }
       .link-mode {
-        color: #4a9eff;
+        color: var(--accent);
       }
     `,
   ],
