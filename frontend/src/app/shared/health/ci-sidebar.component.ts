@@ -29,6 +29,7 @@ import { HealthBadgeComponent } from './health-badge.component';
   `,
   styles: [
     `
+      :host { display: block; }
       .sidebar { width: 14rem; flex-shrink: 0; border-right: 1px solid var(--border); padding-right: 1rem; }
       .product-name { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem; }
       .list { display: flex; flex-direction: column; gap: 0.25rem; }

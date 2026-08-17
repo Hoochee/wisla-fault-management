@@ -82,6 +82,7 @@ export class HealthProductPageComponent implements OnInit {
   readonly deleteTarget = signal(false);
   readonly deleteBlocked = signal(false);
   readonly weightError = signal('');
+  readonly weightModalOpen = signal(false);
 
   readonly filteredCis = computed(() => {
     const q = this.ciSearch.trim().toLowerCase();
@@ -242,6 +243,35 @@ export class HealthProductPageComponent implements OnInit {
     }));
   }
 
+  /** Admin slots overlay snapshot rows so «Вес» stays in sync after PATCH. */
+  get displayComponents() {
+    const snapshot = this.product?.components ?? [];
+    const admin = this.productAdmin?.components ?? [];
+    if (!admin.length) return snapshot;
+    const byCode = new Map(snapshot.map((c) => [c.code, c]));
+    return admin.map((a) => {
+      const s = byCode.get(a.code);
+      return {
+        code: a.code,
+        name: a.name,
+        healthPercent: s?.healthPercent ?? 100,
+        damagePercent: s?.damagePercent ?? 0,
+        weight: a.weight,
+        influenceType: a.influenceType,
+        ciIds: a.ciIds,
+      };
+    });
+  }
+
+  openWeightModal(): void {
+    this.weightError.set('');
+    this.weightModalOpen.set(true);
+  }
+
+  closeWeightModal(): void {
+    this.weightModalOpen.set(false);
+  }
+
   saveComponentWeights(components: ProductComponentPatch[]): void {
     if (!this.product) return;
     this.saving.set(true);
@@ -250,6 +280,7 @@ export class HealthProductPageComponent implements OnInit {
       next: (updated) => {
         this.saving.set(false);
         this.productAdmin = updated;
+        this.closeWeightModal();
         this.reloadCard();
       },
       error: (err: HttpErrorResponse) => {

@@ -158,6 +158,9 @@ test.describe('Product health graph', () => {
     });
     await openProductPage(page, productName);
 
+    await expect(page.locator('app-component-weight-editor')).toHaveCount(0);
+
+    await page.getByRole('button', { name: '\u0412\u0435\u0441\u0430 \u043a\u043e\u043c\u043f\u043e\u043d\u0435\u043d\u0442\u043e\u0432' }).click();
     const editor = page.locator('app-component-weight-editor');
     await expect(editor).toBeVisible({ timeout: 15000 });
     const weightInput = editor.locator('input[type="number"]').first();
@@ -177,6 +180,7 @@ test.describe('Product health graph', () => {
     await editor.getByRole('button', { name: '\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c' }).click();
     const patchResp = await patchPromise;
     expect(patchResp.ok()).toBeTruthy();
+    await expect(editor).toHaveCount(0);
     await dismissToasts(page);
 
     // Reload via SPA shell: GET /health is actuator JSON, so do not page.goto('/health').
@@ -185,6 +189,15 @@ test.describe('Product health graph', () => {
     await expect(heatCellForProduct(page, productName)).toBeVisible({ timeout: 15000 });
     await openProductPage(page, productName);
 
+    await expect(page.locator('app-component-weight-editor')).toHaveCount(0);
+    const componentRow = page.locator('.components-card tbody tr').filter({
+      has: page.locator('td.num'),
+    }).first();
+    await expect(componentRow).toBeVisible({ timeout: 15000 });
+    const weightCell = componentRow.locator('td.num').nth(1);
+    await expect(weightCell).toHaveText(String(nextWeight), { timeout: 15000 });
+
+    await page.getByRole('button', { name: '\u0412\u0435\u0441\u0430 \u043a\u043e\u043c\u043f\u043e\u043d\u0435\u043d\u0442\u043e\u0432' }).click();
     const editorAfter = page.locator('app-component-weight-editor');
     await expect(editorAfter.locator('input[type="number"]').first()).toHaveValue(String(nextWeight), {
       timeout: 15000,

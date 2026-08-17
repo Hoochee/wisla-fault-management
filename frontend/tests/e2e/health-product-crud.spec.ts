@@ -95,8 +95,9 @@ test.describe('Health product CRUD', () => {
 
     await expect(heatCellForProduct(page, productName)).toBeVisible({ timeout: 15000 });
     // New product is auto-selected after heatmap reload; bound CI appears in the operative panel.
-    await expect(page.locator('app-ci-sidebar')).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('app-ci-sidebar').getByText('demo-server.wisla.local')).toBeVisible();
+    await expect(page.locator('app-ci-sidebar .fqdn', { hasText: 'demo-server.wisla.local' })).toBeVisible({
+      timeout: 15000,
+    });
   });
 
   test('delete blocked with linked CI; unlink then delete succeeds', async ({ page }) => {

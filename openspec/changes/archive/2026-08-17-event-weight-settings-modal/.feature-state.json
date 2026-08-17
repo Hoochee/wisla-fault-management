@@ -1,0 +1,25 @@
+{
+  "phase": "done",
+  "jiraKey": "FM-13",
+  "changeName": "event-weight-settings-modal",
+  "branch": "feature/FM-13",
+  "modules": ["frontend/"],
+  "approvals": {
+    "scope": true,
+    "artifacts": true,
+    "readyForPr": true
+  },
+  "tests": {
+    "backend": "skipped",
+    "frontend": "passed",
+    "frontend_e2e": "passed"
+  },
+  "testFixIterations": {
+    "backend": 0,
+    "frontend": 1
+  },
+  "codeReview": {
+    "backend": { "status": "skipped", "iterations": 0 },
+    "frontend": { "status": "approved", "iterations": 0 }
+  }
+}

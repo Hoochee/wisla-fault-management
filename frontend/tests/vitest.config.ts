@@ -9,6 +9,11 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: [path.resolve(__dirname, 'vitest.setup.ts')],
     include: ['tests/unit/**/*.test.ts'],
+    server: {
+      deps: {
+        inline: [/@angular\//],
+      },
+    },
   },
   resolve: {
     alias: {
