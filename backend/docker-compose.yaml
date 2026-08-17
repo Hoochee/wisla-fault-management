@@ -43,6 +43,8 @@ services:
   kafka:
     image: apache/kafka:3.8.1
     hostname: kafka
+    extra_hosts:
+      - "kafka:127.0.0.1"
     ports:
       - "9092:9092"
     environment:

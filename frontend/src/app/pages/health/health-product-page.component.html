@@ -14,6 +14,7 @@
       <div class="top-actions">
         @if (isAdmin()) {
           <button type="button" class="btn" (click)="openEditProduct()">Редактировать</button>
+          <button type="button" class="btn" (click)="openWeightModal()">Веса компонентов</button>
           <button type="button" class="btn-danger" (click)="confirmDeleteProduct()">Удалить продукт</button>
         }
         <div class="stats">
@@ -83,7 +84,7 @@
             </tr>
           </thead>
           <tbody>
-            @for (c of product.components ?? []; track c.code) {
+            @for (c of displayComponents; track c.code) {
               <tr>
                 <td>{{ c.name }}</td>
                 <td>
@@ -114,15 +115,6 @@
         <p class="empty-row">Не удалось загрузить историю здоровья</p>
       }
       <app-health-history-heatmap [buckets]="history" />
-
-      <app-component-weight-editor
-        [components]="editorComponents"
-        [cis]="ciList"
-        [editable]="isAdmin()"
-        [saving]="saving()"
-        [error]="weightError()"
-        (saveComponents)="saveComponentWeights($event)"
-      />
     </section>
 
     <div class="ci-strip">
@@ -171,6 +163,24 @@
   <div class="empty">
     <p>Продукт не найден</p>
     <a routerLink="/health">← Назад</a>
+  </div>
+}
+
+@if (weightModalOpen()) {
+  <div class="overlay" (click)="closeWeightModal()">
+    <div class="modal modal-wide" (click)="$event.stopPropagation()">
+      <app-component-weight-editor
+        [components]="editorComponents"
+        [cis]="ciList"
+        [editable]="true"
+        [saving]="saving()"
+        [error]="weightError()"
+        (saveComponents)="saveComponentWeights($event)"
+      />
+      <div class="modal-actions">
+        <button type="button" class="btn" (click)="closeWeightModal()">Отмена</button>
+      </div>
+    </div>
   </div>
 }
 
