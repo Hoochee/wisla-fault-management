@@ -18,9 +18,9 @@ OpenSpec slash commands: `/opsx:explore`, `/opsx:propose`, `/opsx:apply`, `/opsx
 
 ## On invocation
 
-Input: `/build-feature WISLA-12345` or `/build-feature <change-name>` or description of the feature.
+Input: `/build-feature WISLA-12345` or `/build-feature FM-<n>` (backlog, no Jira URL) or `/build-feature <change-name>` or description of the feature.
 
-1. Resolve Jira key (if provided) via chrome-devtools MCP — Wellink browse URL `https://support.wellink.ru/browse/<KEY>`
+1. Resolve Jira key (if a Jira key is provided) via chrome-devtools MCP — Wellink browse URL `https://support.wellink.ru/browse/<KEY>`. A backlog ID `FM-<n>` is an acceptable substitute — read `BACKLOG.md`, skip Jira.
 2. If the user asks «что дальше», «из беклога», «следующую задачу», or `/build-feature` with no key/description — read [`BACKLOG.md`](../BACKLOG.md) and offer a `ready` item (explain `blocked`/`parked`). Do not invent a new epic instead of the backlog.
 3. Read `openspec/changes/<change>/.feature-state.json` (create on bootstrap if missing)
 4. Determine current `phase`; execute **ONE phase step** per invocation unless user asks to continue

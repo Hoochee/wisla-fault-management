@@ -4,25 +4,29 @@ Run at the beginning of `/build-feature` when `.feature-state.json` does not exi
 
 ## Inputs
 
-- Jira key: `WISLA-<number>` (**required** for branch naming when available; other project keys allowed if ticket uses them)
-- Change name: kebab-case (derived from Jira title or user description)
+- Jira key: `WISLA-<number>` (**required** for branch naming when a ticket exists; other project keys allowed if the ticket uses them)
+- Or backlog ID `FM-<n>` from [`BACKLOG.md`](../BACKLOG.md) when there is no Jira ticket — use as the workflow key instead of Jira (do **not** invent a Jira URL)
+- Change name: kebab-case (derived from Jira title, backlog title, or user description)
 - Base branch: always `main`
 
 ## Steps
 
-1. **Read Jira** (if key provided)
+1. **Read Jira** (if a Jira key is provided)
    - MCP `user-chrome-devtools`: navigate to `https://support.wellink.ru/browse/<KEY>`
    - `take_snapshot` — extract title, description, acceptance criteria
-   - If Jira key is missing — ask the user before creating a branch
+   - If the user picked a backlog item `FM-<n>` — read title/scope from [`BACKLOG.md`](../BACKLOG.md), skip Jira, do not invent a browse URL
+   - If both Jira and `FM-<n>` are missing — ask the user before creating a branch
 
 2. **Derive names**
    - `changeName`: kebab-case, e.g. `console-column-sort`
-   - `branch`: `feature/WISLA-<number>` (number from Jira key only — no kebab suffix; use full key if prefix ≠ WISLA)
+   - `branch`: `feature/WISLA-<number>` (Jira; number from key only — no kebab suffix; use full key if prefix ≠ WISLA) or `feature/FM-<n>` (backlog without Jira)
 
 3. **Git branch**
    ```bash
    git fetch origin main
    git switch -c feature/WISLA-<number> --no-track origin/main
+   # or, backlog without Jira:
+   git switch -c feature/FM-<n> --no-track origin/main
    ```
    **Critical:** always use `--no-track`. Without it, the new branch inherits upstream `origin/main`, and IDE push becomes `feature/...:main` (rejected on protected `main`).
 
@@ -30,7 +34,7 @@ Run at the beginning of `/build-feature` when `.feature-state.json` does not exi
    ```bash
    git push -u origin HEAD
    ```
-   That creates `origin/feature/WISLA-<number>` and sets the correct upstream.
+   That creates `origin/feature/WISLA-<number>` or `origin/feature/FM-<n>` and sets the correct upstream.
 
    Do not commit unless user explicitly asks.
 
@@ -71,6 +75,8 @@ Run at the beginning of `/build-feature` when `.feature-state.json` does not exi
      }
    }
    ```
+
+   For a backlog item without Jira, set `"jiraKey": "FM-<n>"` and `"branch": "feature/FM-<n>"` (same field, no browse URL).
 
    `tests.frontend_e2e` tracks Playwright e2e (mandatory alongside Vitest whenever frontend is in scope — see `orchestrator-playbook.md#frontend-test-gate`).
 

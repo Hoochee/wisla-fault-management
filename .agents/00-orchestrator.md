@@ -16,10 +16,10 @@ Main coordinator for `/build-feature`. **Only agent that communicates with the u
 ## Inputs
 
 - User messages
-- Repo-root [`BACKLOG.md`](../BACKLOG.md) — when the user asks what to do next or to take a backlog item
+- Repo-root [`BACKLOG.md`](../BACKLOG.md) — when the user asks what to do next or to take a backlog item. Backlog ID `FM-<n>` is an acceptable substitute for a Jira key (branch `feature/FM-<n>`, no fake Jira URL).
 - `openspec/changes/<change>/.feature-state.json`
 - OpenSpec artifacts: `proposal.md`, `specs/`, `design.md`, `tasks.md`
-- Jira (via orchestrator reading chrome-devtools MCP)
+- Jira (via orchestrator reading chrome-devtools MCP) — skip when the work is a backlog `FM-<n>` without a Wellink ticket
 
 ## Outputs
 

@@ -2,12 +2,12 @@
 name: /build-feature
 id: build-feature
 category: Workflow
-description: Orchestrate a Fault Management feature from Jira through OpenSpec to tested implementation
+description: Orchestrate a Fault Management feature from Jira or a backlog ID through OpenSpec to tested implementation
 ---
 
 Orchestrate incremental feature work in WISLA Fault Management using multi-agent workflow with gates.
 
-**Input**: Jira key (`WISLA-12345` or other), change name (kebab-case), or feature description. Optional: `continue` to resume from `.feature-state.json`.
+**Input**: Jira key (`WISLA-12345` or other), backlog ID (`FM-<n>` from `BACKLOG.md` when there is no Jira ticket), change name (kebab-case), or feature description. Optional: `continue` to resume from `.feature-state.json`.
 
 **Load skill**: Follow `.cursor/skills/build-feature/SKILL.md` and `build-feature/SKILL.core.md`.
 
@@ -17,12 +17,13 @@ Orchestrate incremental feature work in WISLA Fault Management using multi-agent
 
 1. **Resolve feature identity**
    - If Jira key given — read Jira via chrome-devtools MCP (`https://support.wellink.ru/browse/<KEY>`)
+   - If backlog ID `FM-<n>` given — read title/scope from `BACKLOG.md`; do not invent a Jira URL
    - Derive `changeName` (kebab-case) from title or user input
    - If resuming — read `openspec/changes/<changeName>/.feature-state.json`
 
 2. **Bootstrap** (if `phase === "bootstrap"` or no state file)
    - `git fetch origin main`
-   - Create git branch from `origin/main` with `--no-track`: `git switch -c feature/WISLA-<n> --no-track origin/main` (never inherit upstream `main`)
+   - Create git branch from `origin/main` with `--no-track`: `git switch -c feature/WISLA-<n> --no-track origin/main` (Jira) or `feature/FM-<n>` (backlog without Jira); never inherit upstream `main`
    - `openspec new change "<changeName>"` if change does not exist
    - Write `.feature-state.json` per `build-feature/bootstrap.md`
    - Set `phase: discovery`

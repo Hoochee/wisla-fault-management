@@ -5,7 +5,7 @@
 | # | Файл | Роль | Артефакты |
 |---|------|------|-----------|
 | 00 | [.agents/00-orchestrator.md](../.agents/00-orchestrator.md) | Координация, gates | `.feature-state.json` |
-| 01 | [.agents/01-system-analyst.md](../.agents/01-system-analyst.md) | Scope из Jira | summary для proposal |
+| 01 | [.agents/01-system-analyst.md](../.agents/01-system-analyst.md) | Scope из Jira или беклога `FM-<n>` | summary для proposal |
 | 05 | [.agents/05-architect.md](../.agents/05-architect.md) | Design по модулям | `design.md`, specs |
 | 07 | [.agents/07-backend-engineer.md](../.agents/07-backend-engineer.md) | Java Spring Boot | код в `backend/*` |
 | 08 | [.agents/08-backend-test-engineer.md](../.agents/08-backend-test-engineer.md) | Maven Surefire | `mvn test` |

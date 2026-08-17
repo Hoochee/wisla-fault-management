@@ -11,9 +11,9 @@ Core characteristics:
 - Product docs and OpenAPI under `docs/`.
 - Implemented capabilities tracked in `openspec/specs/`.
 
-Default git branch: **`main`**. Feature branches: `feature/WISLA-<n>` from `origin/main` with `--no-track` (other keys: `feature/<FULL-KEY>`).
+Default git branch: **`main`**. Feature branches: `feature/WISLA-<n>` from `origin/main` with `--no-track` (Jira), or `feature/FM-<n>` for a backlog item without Jira (other keys: `feature/<FULL-KEY>`).
 
-Product backlog (deferred work): **[`BACKLOG.md`](BACKLOG.md)** at repo root. Items have a priority (Критический / Высокий / Средний / Низкий). If the user asks what to do next / to take a backlog item, read that file — do not invent scope.
+Product backlog (deferred work): **[`BACKLOG.md`](BACKLOG.md)** at repo root. Items have a stable ID `FM-<n>` and a priority (Критический / Высокий / Средний / Низкий). If the user asks what to do next / to take a backlog item, read that file — do not invent scope.
 
 ## Module Layout
 
@@ -63,7 +63,7 @@ cd frontend && npm run test:e2e
 
 - OpenSpec: `/opsx:explore`, `/opsx:propose`, `/opsx:apply`, `/opsx:sync`, `/opsx:archive`
 - Full feature orchestration: `/build-feature` (see `build-feature/`, `.agents/`, `openspec/TEAM.md`)
-- Deferred work: [`BACKLOG.md`](BACKLOG.md) — consult when the user asks for the next task or a backlog item
+- Deferred work: [`BACKLOG.md`](BACKLOG.md) — consult when the user asks for the next task or a backlog item (`FM-<n>` is the workflow key when there is no Jira ticket)
 - Prefer TDD and existing module boundaries; do not invent new top-level services without approval
 
 ## Do not
