@@ -1,7 +1,6 @@
 import { test, expect, loginAsAdmin, E2E_ADMIN_LOGIN, E2E_ADMIN_PASSWORD } from './fixtures/auth';
+import { resolveIngestApiKey } from './fixtures/ingest-source';
 import type { APIRequestContext, Page, Request, Response } from '@playwright/test';
-
-const DEMO_SOURCE_API_KEY = 'demo-source-key';
 
 function uniqueSuffix(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -46,8 +45,9 @@ async function loginAdminApi(request: APIRequestContext): Promise<string> {
 }
 
 async function ingestDutyEvent(request: APIRequestContext, title: string): Promise<string> {
+  const apiKey = await resolveIngestApiKey(request);
   const ingest = await request.post('/api/v1/ingest', {
-    headers: { 'X-Api-Key': DEMO_SOURCE_API_KEY },
+    headers: { 'X-Api-Key': apiKey },
     data: {
       events: [
         {
