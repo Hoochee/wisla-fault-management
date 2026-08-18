@@ -126,12 +126,16 @@ public class ProcessRawEventBatchService implements ProcessRawEventBatchUseCase 
                 executedRules.add(intent.ruleId());
             }
             for (ProcessingDecision.NotifyIntent intent : decision.notifyIntents()) {
-                notifications.notify(intent.ruleId(), intent.channel(), intent.emailAddress());
+                if (!saved.isSilenced(clock.instant())) {
+                    notifications.notify(intent.ruleId(), intent.channel(), intent.emailAddress());
+                }
                 executedRules.add(intent.ruleId());
             }
             for (ProcessingDecision.PushIntent intent : decision.pushIntents()) {
-                String message = pushMessageRenderer.render(intent.message(), saved);
-                pushNotifications.createPush(intent.ruleId(), saved.getId(), saved.getTitle(), message);
+                if (!saved.isSilenced(clock.instant())) {
+                    String message = pushMessageRenderer.render(intent.message(), saved);
+                    pushNotifications.createPush(intent.ruleId(), saved.getId(), saved.getTitle(), message);
+                }
                 executedRules.add(intent.ruleId());
             }
 

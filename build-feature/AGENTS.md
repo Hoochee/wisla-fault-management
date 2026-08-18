@@ -2,6 +2,8 @@
 
 Главная точка входа: `/build-feature`. Только **00-orchestrator** (через skill) общается с пользователем.
 
+Входной пункт беклога может прийти из апстрим-воркфлоу `/discovery` (см. [`discovery/AGENTS.md`](../discovery/AGENTS.md)): `/discovery` → `BACKLOG.md` (`FM-<n>`, `ready`) → `/build-feature FM-<n>`. Discovery не создаёт ветку и OpenSpec change — это делает bootstrap здесь.
+
 | # | Файл | Роль | Артефакты |
 |---|------|------|-----------|
 | 00 | [.agents/00-orchestrator.md](../.agents/00-orchestrator.md) | Координация, gates | `.feature-state.json` |
@@ -9,9 +11,14 @@
 | 05 | [.agents/05-architect.md](../.agents/05-architect.md) | Design по модулям | `design.md`, specs |
 | 07 | [.agents/07-backend-engineer.md](../.agents/07-backend-engineer.md) | Java Spring Boot | код в `backend/*` |
 | 08 | [.agents/08-backend-test-engineer.md](../.agents/08-backend-test-engineer.md) | Maven Surefire | `mvn test` |
-| 09 | [.agents/09-code-reviewer.md](../.agents/09-code-reviewer.md) | Code review (Quality + Standards + Spec) | verdict → fix loop |
+| 09 | [.agents/09-code-reviewer.md](../.agents/09-code-reviewer.md) | Code review — Code Quality (Quality + Standards + Spec), всегда | verdict → fix loop |
 | 10 | [.agents/10-frontend-engineer.md](../.agents/10-frontend-engineer.md) | Angular 18 SPA | `frontend/` |
 | 11 | [.agents/11-frontend-test-engineer.md](../.agents/11-frontend-test-engineer.md) | Vitest + Playwright e2e (оба обязательны) | `npm test`, `npm run test:e2e` |
+| 12 | [.agents/12-security-reviewer.md](../.agents/12-security-reviewer.md) | Review-специалист: Security (`backend_review`/`frontend_review`, risk-gated) | verdict `ref: security` |
+| 13 | [.agents/13-db-api-reviewer.md](../.agents/13-db-api-reviewer.md) | Review-специалист: DB/API contract (`backend_review`/`frontend_review`, risk-gated) | verdict `ref: db-api` |
+| 14 | [.agents/14-performance-reviewer.md](../.agents/14-performance-reviewer.md) | Review-специалист: Performance/FinOps (`backend_review`/`frontend_review`, risk-gated) | verdict `ref: perf` |
+
+Review-стадия — **параллельная и risk-gated**: 09 (всегда) + применимые специалисты 12/13/14 запускаются одним сообщением (несколько Task, max 4). Выбор специалистов — по `state.riskLevel` и триггерам области; см. [orchestrator-playbook.md](orchestrator-playbook.md#risk-gated-specialists) и [`../discovery/references/risk-levels.md`](../discovery/references/risk-levels.md).
 
 Документация: [SKILL.core.md](SKILL.core.md) · [orchestrator-playbook.md](orchestrator-playbook.md) · беклог: [`BACKLOG.md`](../BACKLOG.md)
 

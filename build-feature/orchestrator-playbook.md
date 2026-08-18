@@ -12,6 +12,7 @@ Created by [bootstrap.md](bootstrap.md) at `openspec/changes/<changeName>/.featu
   "jiraKey": null,
   "changeName": "",
   "branch": "",
+  "riskLevel": null,
   "modules": [],
   "approvals": {
     "scope": false,
@@ -28,11 +29,22 @@ Created by [bootstrap.md](bootstrap.md) at `openspec/changes/<changeName>/.featu
     "frontend": 0
   },
   "codeReview": {
-    "backend": { "status": "pending", "iterations": 0 },
-    "frontend": { "status": "pending", "iterations": 0 }
+    "backend": { "status": "pending", "iterations": 0, "reviewers": {} },
+    "frontend": { "status": "pending", "iterations": 0, "reviewers": {} }
   }
 }
 ```
+
+`riskLevel` is one of `"L0"`..`"L4"` or `null`. It is set at [bootstrap](bootstrap.md) from the linked Discovery Brief (`openspec/discovery/<slug>/problem.md`) when the backlog item came from `/discovery`. If unknown (`null`), treat it as **`L2`** at review time (see [Risk-gated specialists](#risk-gated-specialists)).
+
+`codeReview.<scope>.reviewers` maps a reviewer id → its verdict for the latest review round:
+
+- `quality` → 09-code-reviewer (always runs)
+- `security` → 12-security-reviewer
+- `db-api` → 13-db-api-reviewer
+- `perf` → 14-performance-reviewer
+
+Each value is `"approved"`, `"changes_requested"`, or `"skipped"` (spawned-but-not-applicable, i.e. the specialist returned `SUMMARY: not applicable`, or gating did not spawn it). The scope `status` is the aggregate (see [Review verdict aggregation](#review-verdict-aggregation)).
 
 `tests.frontend_e2e` tracks Playwright e2e separately from Vitest (`tests.frontend`) because they run against different prerequisites (e2e needs a live backend), but both are produced by the same `frontend_tests` phase / same subagent (11-frontend-test-engineer) and gate the **same** transition to `review`. `testFixIterations.frontend` is a shared budget covering fixes to either suite (see [Test fix loop](#test-fix-loop)).
 
@@ -53,10 +65,10 @@ Deferred work lives in repo-root [`BACKLOG.md`](../BACKLOG.md).
 | design | `/opsx:propose` via propose skill; delegate 05-architect review of design | design | **user:** `approvals.artifacts = true` |
 | design | Verify all `applyRequires` artifacts exist | backend | auto when artifacts done + user approved |
 | backend | Delegate: 07-backend-engineer × N modules (parallel max 4) | backend_review | auto when all Tasks complete |
-| backend_review | Delegate: 09-code-reviewer (`reviewScope: backend`) | backend_tests or backend | **auto:** approved → tests; changes_requested → fix loop |
+| backend_review | Delegate **in parallel** (one message, multiple Task calls, max 4): 09-code-reviewer (`reviewScope: backend`) + risk-gated specialists (12/13/14 per [gating](#risk-gated-specialists)) | backend_tests or backend | **auto:** all reviewers approved/skipped → tests; any changes_requested → fix loop |
 | backend_tests | Delegate: 08-backend-test-engineer | frontend | **auto:** `mvn test` exit 0 → `tests.backend = passed` |
 | frontend | Delegate: 10-frontend-engineer (skip if no frontend in modules/tasks) | frontend_review | auto |
-| frontend_review | Delegate: 09-code-reviewer (`reviewScope: frontend`) | frontend_tests or frontend | **auto:** approved → tests; changes_requested → fix loop |
+| frontend_review | Delegate **in parallel** (one message, multiple Task calls, max 4): 09-code-reviewer (`reviewScope: frontend`) + risk-gated specialists (12/13/14 per [gating](#risk-gated-specialists)) | frontend_tests or frontend | **auto:** all reviewers approved/skipped → tests; any changes_requested → fix loop |
 | frontend_tests | Delegate: 11-frontend-test-engineer | review | **auto:** `npm test` exit 0 **and** `npm run test:e2e` exit 0 (both required, see [Frontend test gate](#frontend-test-gate)) → `tests.frontend = passed`, `tests.frontend_e2e = passed` |
 | review | User reviews diff; optional manual QA | done | **user:** `approvals.readyForPr = true` |
 | done | `/opsx:sync` + `/opsx:archive` | done | notify user |
@@ -131,30 +143,52 @@ Same for `testFixIterations.frontend` with 11-frontend-test-engineer — this si
 
 ## Code review loop
 
-After developer (07 or 10) completes, orchestrator advances to `backend_review` or `frontend_review` and delegates **09-code-reviewer**.
+After developer (07 or 10) completes, the orchestrator advances to `backend_review` or `frontend_review` and delegates a **parallel, risk-gated review stage**: **09-code-reviewer** (Code Quality — always) plus the applicable specialist reviewers (12 Security, 13 DB/API, 14 Performance/FinOps). All reviewers are spawned **in a single message with multiple Task calls** (max 4 concurrent per [Parallel limits](#parallel-limits)); each returns the **same verdict contract** scoped to its axis.
 
-### Review verdict parsing
+### Risk-gated specialists
 
-Reviewer returns `VERDICT: approved` or `VERDICT: changes_requested` plus `BLOCKING_FINDINGS` list.
+Which reviewers run is a function of `state.riskLevel` (see [`../discovery/references/risk-levels.md`](../discovery/references/risk-levels.md); `null` ⇒ treat as `L2`) **and** whether the change actually touches each specialist's area. Discovery **classifies** the level; `/build-feature` **enforces** the review depth here. Always assign the **deepest applicable coverage**: a specialist is also spawned regardless of level whenever its trigger is clearly present, because scope signals can exceed the assigned level.
 
-| Verdict | Action |
-|---------|--------|
-| `approved` | Set `codeReview.<scope>.status = "approved"` → advance to `*_tests` phase |
-| `changes_requested` | Increment `codeReview.<scope>.iterations` |
+| Level | Code Quality (09) | Security (12) | DB/API (13) | Performance (14) |
+|-------|:---:|:---:|:---:|:---:|
+| **L0** | ✅ | — | — | — |
+| **L1** | ✅ | — | — | — |
+| **L2** (default) | ✅ | — | — | — |
+| **L3** | ✅ | if touches area¹ | if touches area² | — |
+| **L4** | ✅ | if touches area¹ | if touches area² | ✅ |
+
+**Trigger override (any level):** spawn the specialist even below its level when its trigger is clearly present.
+
+- ¹ **Security (12)** — change touches `common/security`, auth/JWT/roles, API-key filters, new endpoints handling untrusted input, or persistence of sensitive data.
+- ² **DB/API (13)** — change touches `backend/*/src/main/resources/db/changelog/`, any `*.api.yaml`/controllers/DTOs, or persistence adapters (any Liquibase/OpenAPI change ⇒ spawn regardless of level).
+- **Performance (14)** — `L4`, or change touches event-processing hot paths, batch/ingest, or queries on large tables.
+
+A spawned specialist that finds its area not actually touched returns `VERDICT: approved` / `SUMMARY: not applicable` — record it as `skipped` in `reviewers`. Spawning uniformly (each prompt self-gates via its "Applies when" rule) keeps orchestration simple.
+
+**L4 — mandatory human decision:** for `riskLevel === L4`, the orchestrator must **not** leave the review phase on auto-gate alone. After all reviewers approve, pause and require an explicit human decision (independent verification / sign-off) in Russian before advancing to the test phase — per L4 rigor in `risk-levels.md` ("do not proceed without an explicit human decision").
+
+### Review verdict aggregation
+
+Each reviewer returns `VERDICT: approved` or `VERDICT: changes_requested` plus a `BLOCKING_FINDINGS` list. Record each reviewer's result in `codeReview.<scope>.reviewers[<id>]` (`approved` | `changes_requested` | `skipped`), then aggregate:
+
+| Aggregate condition | Scope `status` | Action |
+|---------------------|----------------|--------|
+| Every spawned reviewer is `approved` or `skipped` (not applicable) | `approved` | Advance to `*_tests` phase (for `L4`, after the mandatory human decision) |
+| Any reviewer returned `changes_requested` | `changes_requested` | Increment `codeReview.<scope>.iterations`; run the fix loop with the **union** of all reviewers' `BLOCKING_FINDINGS` |
 
 ### Fix loop (max 3 iterations)
 
-When `changes_requested`:
+When aggregate is `changes_requested`:
 
 1. If `codeReview.<scope>.iterations` ≤ **3**:
    - Set `codeReview.<scope>.status = "changes_requested"`
-   - Re-delegate **07-backend-engineer** or **10-frontend-engineer** with blocking findings in prompt
-   - After dev Task completes → re-delegate **09-code-reviewer** with `prior_findings` from last review
+   - Re-delegate **07-backend-engineer** or **10-frontend-engineer** once with the **union of BLOCKING_FINDINGS** from all reviewers (each finding keeps its `ref: quality|spec|standard|security|db-api|perf` tag)
+   - After the dev Task completes → re-run the **same parallel review stage** (09 + the same spawned specialists) with `prior_findings` from the last round; each reviewer verifies only its own prior blocking findings
 2. If `codeReview.<scope>.iterations` > **3**:
    - Set `codeReview.<scope>.status = "escalated"`
-   - **Stop** — orchestrator reports to user in Russian: summary of unresolved blocking findings, iteration count, options (manual fix / override / abort)
+   - **Stop** — orchestrator reports to user in Russian: summary of unresolved blocking findings grouped by reviewer, iteration count, options (manual fix / override / abort)
 
-Do not advance to test phase while `codeReview.<scope>.status === "changes_requested"` or `"escalated"` without user decision on escalation.
+Do not advance to the test phase while `codeReview.<scope>.status === "changes_requested"` or `"escalated"` without a user decision on escalation.
 
 ### Skipping code review
 
@@ -165,7 +199,8 @@ Do not advance to test phase while `codeReview.<scope>.status === "changes_reque
 
 - Backend implementation: max **4** concurrent Tasks (one per module)
 - Backend tests: max **4** concurrent Tasks
-- Frontend: sequential (one Task for 10, one for 11)
+- Frontend implementation/tests: sequential (one Task for 10, one for 11)
+- Review stage (`backend_review` / `frontend_review`): the risk-gated reviewers (09 + applicable specialists 12/13/14) run **in parallel**, max **4** concurrent Tasks — at most 4 reviewers exist, so all spawned reviewers fit in one batch
 
 ## OpenSpec commands
 

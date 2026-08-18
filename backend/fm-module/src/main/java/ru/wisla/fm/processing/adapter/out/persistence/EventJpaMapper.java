@@ -34,6 +34,10 @@ public class EventJpaMapper {
         entity.setLastRepeatAt(event.getLastRepeatAt());
         entity.setTakenAt(event.getTakenAt());
         entity.setClosedAt(event.getClosedAt());
+        entity.setAcknowledgedAt(event.getAcknowledgedAt());
+        entity.setAcknowledgedByUserId(event.getAcknowledgedByUserId());
+        entity.setSilencedUntil(event.getSilencedUntil());
+        entity.setSilencedByUserId(event.getSilencedByUserId());
         entity.setCreatedAt(event.getCreatedAt());
         entity.setUpdatedAt(event.getUpdatedAt());
         return entity;
@@ -62,6 +66,10 @@ public class EventJpaMapper {
         event.setLastRepeatAt(entity.getLastRepeatAt());
         event.setTakenAt(entity.getTakenAt());
         event.setClosedAt(entity.getClosedAt());
+        event.setAcknowledgedAt(entity.getAcknowledgedAt());
+        event.setAcknowledgedByUserId(entity.getAcknowledgedByUserId());
+        event.setSilencedUntil(entity.getSilencedUntil());
+        event.setSilencedByUserId(entity.getSilencedByUserId());
         event.setCreatedAt(entity.getCreatedAt());
         event.setUpdatedAt(entity.getUpdatedAt());
         return event;

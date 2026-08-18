@@ -389,10 +389,21 @@ export class FmApiService {
 
 
 
-  performEventAction(eventId: string, action: EventActionType, comment?: string): Observable<EventActionResult> {
-
-    return this.api.post<EventActionResult>(`/events/${eventId}/actions`, { action, comment });
-
+  performEventAction(
+    eventId: string,
+    action: EventActionType,
+    extra?: { comment?: string; assignedUserId?: string; silenceMinutes?: number },
+  ): Observable<EventActionResult> {
+    const body: {
+      action: EventActionType;
+      comment?: string;
+      assignedUserId?: string;
+      silenceMinutes?: number;
+    } = { action };
+    if (extra?.comment != null) body.comment = extra.comment;
+    if (extra?.assignedUserId != null) body.assignedUserId = extra.assignedUserId;
+    if (extra?.silenceMinutes != null) body.silenceMinutes = extra.silenceMinutes;
+    return this.api.post<EventActionResult>(`/events/${eventId}/actions`, body);
   }
 
 
@@ -557,10 +568,12 @@ export class FmApiService {
 
 
 
-  listUsers(): Observable<User[]> {
-
-    return this.api.get<{ items: User[] }>('/admin/users').pipe(map((res) => res.items));
-
+  listUsers(params?: { active?: boolean }): Observable<User[]> {
+    const query: Record<string, boolean> = {};
+    if (params?.active != null) query['active'] = params.active;
+    return this.api
+      .get<{ items: User[] }>('/admin/users', Object.keys(query).length ? query : undefined)
+      .pipe(map((res) => res.items));
   }
 
 

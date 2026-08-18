@@ -10,7 +10,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import ru.wisla.fm.processing.service.EventActionService;
+import ru.wisla.fm.common.api.NotFoundException;
+import ru.wisla.fm.processing.application.port.in.EventActionCommand;
+import ru.wisla.fm.processing.application.port.in.EventActionOutcome;
+import ru.wisla.fm.processing.application.port.in.PerformEventActionUseCase;
+import ru.wisla.fm.processing.domain.ActionLogEntry;
+import ru.wisla.fm.processing.domain.EventNotFoundException;
+import ru.wisla.fm.processing.domain.UserNotFoundException;
 import ru.wisla.fm.processing.service.EventUpdateService;
 
 import java.util.UUID;
@@ -20,14 +26,14 @@ import java.util.UUID;
 public class EventController {
 
     private final EventQueryService eventQueryService;
-    private final EventActionService eventActionService;
+    private final PerformEventActionUseCase performEventActionUseCase;
     private final EventUpdateService eventUpdateService;
 
     public EventController(EventQueryService eventQueryService,
-                           EventActionService eventActionService,
+                           PerformEventActionUseCase performEventActionUseCase,
                            EventUpdateService eventUpdateService) {
         this.eventQueryService = eventQueryService;
-        this.eventActionService = eventActionService;
+        this.performEventActionUseCase = performEventActionUseCase;
         this.eventUpdateService = eventUpdateService;
     }
 
@@ -37,11 +43,13 @@ public class EventController {
             @RequestParam(required = false) String severity,
             @RequestParam(required = false) UUID sourceId,
             @RequestParam(required = false) UUID ciId,
+            @RequestParam(defaultValue = "false") boolean includeSilenced,
             @RequestParam(required = false) String sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size
     ) {
-        return eventQueryService.listEvents(status, severity, sourceId, ciId, sort, page, size);
+        return eventQueryService.listEvents(
+                status, severity, sourceId, ciId, includeSilenced, sort, page, size);
     }
 
     @GetMapping("/{id}")
@@ -60,6 +68,29 @@ public class EventController {
             @Valid @RequestBody EventActionRequest request,
             Authentication authentication
     ) {
-        return eventActionService.performAction(id, request, authentication);
+        UUID actorUserId = authentication != null ? (UUID) authentication.getPrincipal() : null;
+        try {
+            EventActionOutcome outcome = performEventActionUseCase.perform(new EventActionCommand(
+                    id,
+                    request.action(),
+                    actorUserId,
+                    request.comment(),
+                    request.assignedUserId(),
+                    request.silenceMinutes()));
+            EventDto eventDto = eventQueryService.getEvent(id).event();
+            ActionLogEntry log = outcome.log();
+            return new EventActionResult(
+                    eventDto,
+                    new EventActionLogDto(
+                            log.id(),
+                            log.eventId(),
+                            log.action(),
+                            log.userName(),
+                            log.userId(),
+                            log.createdAt(),
+                            log.details()));
+        } catch (EventNotFoundException | UserNotFoundException ex) {
+            throw new NotFoundException(ex.getMessage());
+        }
     }
 }

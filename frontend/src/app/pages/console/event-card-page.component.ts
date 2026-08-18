@@ -7,13 +7,14 @@ import { FmApiService } from '../../core/api/fm-api.service';
 import { Event, EventDetail } from '../../core/api/api.models';
 import { SeverityBadgeComponent } from '../../shared/severity-badge/severity-badge.component';
 import { StatusBadgeComponent } from '../../shared/status-badge/status-badge.component';
+import { EventDutyActionsComponent } from './event-duty-actions.component';
 
 type EventTab = 'attributes' | 'journal' | 'relations';
 
 @Component({
   selector: 'app-event-card',
   standalone: true,
-  imports: [RouterLink, DatePipe, SeverityBadgeComponent, StatusBadgeComponent],
+  imports: [RouterLink, DatePipe, SeverityBadgeComponent, StatusBadgeComponent, EventDutyActionsComponent],
   template: `
     @if (event) {
       <div class="header">
@@ -61,14 +62,7 @@ type EventTab = 'attributes' | 'journal' | 'relations';
         }
       </div>
 
-      <div class="actions">
-        <button type="button" class="action-btn" [disabled]="acting()" (click)="take()">Принять в работу</button>
-        <button type="button" class="action-btn" [disabled]="acting()" (click)="close()">Закрыть</button>
-      </div>
-
-      @if (actionError()) {
-        <div class="error">{{ actionError() }}</div>
-      }
+      <app-event-duty-actions [event]="event" [disabled]="acting()" (acted)="onDutyActed()" />
 
       <div class="panel">
         @switch (activeTab()) {
@@ -174,11 +168,6 @@ type EventTab = 'attributes' | 'journal' | 'relations';
       .tab { padding: 0.5rem 1rem; background: none; border: none; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; font-size: 0.8125rem; }
       .tab:hover { color: var(--text-primary); }
       .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-      .actions { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
-      .action-btn { padding: 0.5rem 1rem; background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); cursor: pointer; font-size: 0.8125rem; }
-      .action-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-      .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-      .error { color: #f44336; font-size: 0.8125rem; margin-bottom: 1rem; }
       .panel { background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
       .panel-toolbar { display: flex; justify-content: flex-end; margin-bottom: 0.75rem; }
       .link-btn { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.75rem; }
@@ -208,7 +197,6 @@ export class EventCardPageComponent implements OnInit {
 
   event: EventDetail | null = null;
   readonly acting = signal(false);
-  readonly actionError = signal('');
   readonly activeTab = signal<EventTab>('attributes');
   readonly jsonMode = signal(false);
   readonly rootEvent = signal<Event | null>(null);
@@ -229,12 +217,10 @@ export class EventCardPageComponent implements OnInit {
     this.activeTab.set(tab);
   }
 
-  take(): void {
-    this.runAction('take');
-  }
-
-  close(): void {
-    this.runAction('close');
+  onDutyActed(): void {
+    if (!this.event) return;
+    this.loadEvent(this.event.id);
+    this.activeTab.set('journal');
   }
 
   formatAction(action: string): string {
@@ -245,6 +231,12 @@ export class EventCardPageComponent implements OnInit {
         return 'Закрыто';
       case 'comment':
         return 'Комментарий';
+      case 'ack':
+        return 'Подтверждено';
+      case 'assign':
+        return 'Назначено';
+      case 'silence':
+        return 'Скрыто';
       default:
         return action;
     }
@@ -274,22 +266,6 @@ export class EventCardPageComponent implements OnInit {
     const rows = this.attributeRows();
     const obj = Object.fromEntries(rows.map((r) => [r.key, r.value]));
     return JSON.stringify(obj, null, 2);
-  }
-
-  private runAction(action: 'take' | 'close'): void {
-    if (!this.event) return;
-    this.acting.set(true);
-    this.actionError.set('');
-    this.api.performEventAction(this.event.id, action).subscribe({
-      next: () => {
-        this.loadEvent(this.event!.id);
-        this.activeTab.set('journal');
-      },
-      error: () => {
-        this.actionError.set('Не удалось выполнить действие');
-        this.acting.set(false);
-      },
-    });
   }
 
   private loadEvent(id: string): void {

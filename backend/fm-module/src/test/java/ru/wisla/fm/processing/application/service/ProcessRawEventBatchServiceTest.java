@@ -296,6 +296,49 @@ class ProcessRawEventBatchServiceTest {
                         ruleId, eventId, "Disk usage above 90%", "Critical: Disk usage above 90%"));
     }
 
+    @Test
+    void repeatWhileSilencedSuppressesNotifyAndPush() {
+        IncomingRawEvent raw = raw("critical", FQDN);
+        rawEventState.with(raw);
+        Event existing = existingEvent("major");
+        existing.silenceUntil(NOW.plus(30, ChronoUnit.MINUTES), UUID.randomUUID());
+        eventStore.withDuplicate(existing);
+        UUID ruleId = UUID.randomUUID();
+        ruleDefinitions.with(canvasPlan(ruleId), legacyPlan("dedup"));
+
+        service().process(List.of(raw.id()));
+
+        assertThat(existing.getRepeatCount()).isEqualTo(2);
+        assertThat(existing.getLastRepeatAt()).isEqualTo(NOW);
+        assertThat(notifications.deliveries()).isEmpty();
+        assertThat(pushNotifications.pushes()).isEmpty();
+        assertThat(ruleDefinitions.runMarks()).hasSize(1);
+        assertThat(ruleDefinitions.runMarks().getFirst().ruleIds()).contains(ruleId);
+    }
+
+    @Test
+    void repeatAfterSilenceExpiresNotifiesAgain() {
+        IncomingRawEvent raw = raw("critical", FQDN);
+        rawEventState.with(raw);
+        Event existing = existingEvent("major");
+        existing.silenceUntil(NOW.minus(1, ChronoUnit.MINUTES), UUID.randomUUID());
+        eventStore.withDuplicate(existing);
+        UUID ruleId = UUID.randomUUID();
+        ruleDefinitions.with(canvasPlan(ruleId), legacyPlan("dedup"));
+
+        service().process(List.of(raw.id()));
+
+        assertThat(existing.getRepeatCount()).isEqualTo(2);
+        assertThat(existing.getLastRepeatAt()).isEqualTo(NOW);
+        assertThat(notifications.deliveries()).containsExactly(
+                new InMemoryProcessingPorts.Notifications.Delivery(ruleId, "email", "ops@wisla.local"));
+        assertThat(pushNotifications.pushes()).containsExactly(
+                new InMemoryProcessingPorts.PushNotifications.Push(
+                        ruleId, existing.getId(), "Disk usage above 90%", "Critical: Disk usage above 90%"));
+        assertThat(ruleDefinitions.runMarks()).hasSize(1);
+        assertThat(ruleDefinitions.runMarks().getFirst().ruleIds()).contains(ruleId);
+    }
+
     // --- executed rules -----------------------------------------------------------------------
 
     @Test

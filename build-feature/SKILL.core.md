@@ -69,12 +69,13 @@ The `frontend_tests` phase does not advance to `review` unless **both** `tests.f
 
 ### Code review loop
 
-After **07-backend-engineer** or **10-frontend-engineer** completes:
+The review phase is **parallel and risk-gated**: after **07-backend-engineer** or **10-frontend-engineer** completes, the orchestrator spawns **09-code-reviewer** (Code Quality — always) plus the applicable specialist reviewers (12 Security, 13 DB/API, 14 Performance/FinOps) **in one message, multiple Task calls**, max 4 concurrent. Which specialists run depends on `state.riskLevel` and whether the change touches their area — see [orchestrator-playbook.md#risk-gated-specialists](orchestrator-playbook.md#risk-gated-specialists) and [`../discovery/references/risk-levels.md`](../discovery/references/risk-levels.md).
 
-1. Delegate **09-code-reviewer** (`backend_review` / `frontend_review` phase)
-2. If `VERDICT: changes_requested` — re-delegate developer with blocking findings
+1. Delegate 09 + gated specialists in parallel (`backend_review` / `frontend_review` phase); every reviewer emits the **same verdict contract** scoped to its axis
+2. Aggregate: scope `status = approved` only if every spawned reviewer is `approved`/`skipped`; **any** `changes_requested` → re-delegate the developer with the **union** of blocking findings, then re-run the same review stage
 3. Max **3** review-fix iterations per scope (`codeReview.backend` / `codeReview.frontend`)
 4. After 3 unresolved rounds — escalate to user; do not advance to tests without user decision
+5. **L4** — require an explicit human decision before leaving review even when all reviewers approve
 
 ## OpenSpec integration
 

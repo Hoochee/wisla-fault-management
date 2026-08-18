@@ -2,13 +2,20 @@ package ru.wisla.fm.processing.infrastructure.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import ru.wisla.fm.processing.application.port.in.EventActionOutcome;
+import ru.wisla.fm.processing.application.port.in.PerformEventActionUseCase;
 import ru.wisla.fm.processing.application.port.in.ProcessRawEventBatchUseCase;
 import ru.wisla.fm.processing.application.port.out.CiLookupPort;
+import ru.wisla.fm.processing.application.port.out.EventActionLogPort;
 import ru.wisla.fm.processing.application.port.out.EventStorePort;
 import ru.wisla.fm.processing.application.port.out.NotificationPort;
 import ru.wisla.fm.processing.application.port.out.PushNotificationPort;
 import ru.wisla.fm.processing.application.port.out.RawEventStatePort;
 import ru.wisla.fm.processing.application.port.out.RuleDefinitionPort;
+import ru.wisla.fm.processing.application.port.out.UserDirectoryPort;
+import ru.wisla.fm.processing.application.service.PerformEventActionService;
 import ru.wisla.fm.processing.application.service.ProcessRawEventBatchService;
 import ru.wisla.fm.processing.domain.service.CorrelationEvaluator;
 import ru.wisla.fm.processing.domain.service.DedupMerger;
@@ -104,5 +111,22 @@ public class ProcessingConfig {
                 correlationEvaluator,
                 pushMessageRenderer,
                 Clock.systemUTC());
+    }
+
+    @Bean
+    public PerformEventActionUseCase performEventActionUseCase(EventStorePort eventStore,
+                                                               EventActionLogPort actionLog,
+                                                               UserDirectoryPort users,
+                                                               PlatformTransactionManager transactionManager) {
+        PerformEventActionService service = new PerformEventActionService(
+                eventStore, actionLog, users, Clock.systemUTC());
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        return command -> {
+            EventActionOutcome outcome = tx.execute(status -> service.perform(command));
+            if (outcome == null) {
+                throw new IllegalStateException("Duty action transaction returned no outcome");
+            }
+            return outcome;
+        };
     }
 }

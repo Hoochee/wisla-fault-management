@@ -40,6 +40,10 @@ import {
 
 } from '../../shared/event-histogram/event-histogram.component';
 
+import { EventDutyActionsComponent } from './event-duty-actions.component';
+
+import { EventActionResult } from '../../core/api/fm-api.service';
+
 
 
 @Component({
@@ -61,6 +65,8 @@ import {
     QueryBarComponent,
 
     EventHistogramComponent,
+
+    EventDutyActionsComponent,
 
   ],
 
@@ -196,6 +202,8 @@ import {
             </div>
 
             <p>{{ ev.description }}</p>
+
+            <app-event-duty-actions [event]="ev" (acted)="onDutyActed($event)" />
 
           </div>
 
@@ -369,6 +377,16 @@ export class ConsolePageComponent implements OnInit, OnDestroy {
   selectEvent(e: Event): void {
 
     this.selectedEvent.set(e);
+
+  }
+
+
+
+  onDutyActed(result: EventActionResult): void {
+
+    this.selectedEvent.set(result.event);
+
+    this.loadEvents();
 
   }
 

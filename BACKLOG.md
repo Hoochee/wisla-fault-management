@@ -261,6 +261,93 @@
 
 ---
 
+## FM-14 — Полная изоляция e2e от демо-данных
+
+| | |
+|---|---|
+| **Ключ** | `FM-14` |
+| **Статус** | `ready` |
+| **Приоритет** | `Средний` |
+| **Модули** | `frontend/` (Playwright), `backend/docker-compose.yaml`, CI |
+
+**Почему отложено.** Follow-up после префиксной зачистки e2e-продуктов через Admin API. Сейчас `npm run test:e2e` бьёт в тот же PostgreSQL, что и локальное демо (`postgres_data`).
+
+**Что сделать.** Отдельный overlay `docker-compose.e2e.yaml` с эфемерным volume / выделенной БД, чтобы Playwright не делил persistent `postgres_data` с демо. Скрипт `npm run test:e2e:ci`: up → test → `down -v`. Сиды демо (DevDataSeeder, Billing Platform, gift-shop на :5433) с e2e не смешивать.
+
+**Не делать.** Не ломать локальный demo-стенд и volume `postgres_data`. Не тащить изоляцию в инкремент префиксной зачистки.
+
+---
+
+## FM-15 — CI quality gates (GitHub Actions)
+
+| | |
+|---|---|
+| **Ключ** | `FM-15` |
+| **Change (черновик)** | `ci-quality-gates` |
+| **Статус** | `ready` |
+| **Приоритет** | `Средний` |
+| **Модули** | `backend/fm-module`, `backend/adapter`, `backend/zabbix-simulator`, `frontend/` |
+| **Откуда** | follow-up из проектирования PDLC / discovery-воркфлоу; в репозитории пока нет `.github/workflows/` |
+
+**Что сделать.** Настроить автоматические CI quality gates. Пайплайн GitHub Actions на PR в `main`: backend `mvn test` для всех трёх сервисов (`fm-module`, `adapter`, `zabbix-simulator`), frontend `npm test` (Vitest) и `npm run test:e2e` (Playwright, требует поднятого стека), плюс скан зависимостей и скан секретов. Это machine-checkable gate Test→PR, чтобы `/build-feature` опирался на CI-green, а не только на локальные прогоны. Дополняет уровни риска (L0–L4) из `/discovery`: чем выше уровень, тем глубже покрытие гейтами.
+
+**Не делать.** Деплой/CD, Kubernetes, release-автоматизацию, observability/Grafana — это отдельные пункты беклога; здесь только CI-гейты (test/quality).
+
+---
+
+## FM-16 — Типизированные схемы гейтов + machine-check
+
+| | |
+|---|---|
+| **Ключ** | `FM-16` |
+| **Change (черновик)** | `typed-gate-schemas` |
+| **Статус** | `ready` |
+| **Приоритет** | `Средний` |
+| **Модули** | `.agents/`, `build-feature/`, `discovery/`, `openspec/` (воркфлоу/тулинг, не продуктовый код) |
+| **Откуда** | follow-up из проектирования PDLC / discovery-воркфлоу |
+
+**Что сделать.** Ввести JSON/YAML-схемы для каждого перехода между стадиями PDLC/delivery и machine-checkable проверку в оркестраторе перед продвижением фазы. Переходы: Spec→Plan (scope, non-goals, acceptance criteria, NFR, открытые вопросы), Plan→Code (затронутые модули, API/DB-изменения, стратегия миграции и rollback), Code→Test (тест-кейсы, инварианты, негативные сценарии), Test→PR (CI green, coverage/quality threshold, dependency/security scan), PR→Release (ручное решение ответственного, changelog, rollout/rollback), Release→Learn (SLI/SLO, ошибки, latency, бизнес-метрика). Адаптировать идеи Agile-V (typed trace graph, evidence bundle, risk-levels L0–L4) без внешней зависимости. Схемы положить рядом с воркфлоу (напр. `openspec/gates/*.schema.json`), оркестратор валидирует артефакт перед сменой фазы.
+
+**Не делать.** Не тащить внешние фреймворки как зависимость; не менять продуктовый код; полноценный trace-graph рантайм — не в этом пункте (только схемы + проверка на границах).
+
+---
+
+## FM-17 — Learning/Observability-агент → backlog refinement
+
+| | |
+|---|---|
+| **Ключ** | `FM-17` |
+| **Change (черновик)** | `learning-feedback-agent` |
+| **Статус** | `ready` |
+| **Приоритет** | `Средний` |
+| **Модули** | `.agents/`, `build-feature/`, `BACKLOG.md` |
+| **Зависит от** | `-` (можно начать с доступных источников) |
+| **Откуда** | follow-up из проектирования PDLC / discovery-воркфлоу |
+
+**Что сделать.** Добавить в хвост delivery-воркфлоу агента, который после релиза собирает обратную связь (инциденты, метрики, release notes, обращения) и превращает её в улучшения беклога и обновлённые rules/prompts — замыкает цикл Release→Learn→Backlog refinement. Учесть, что в продукте пока нет Grafana / экспорта метрик (осознанно вне scope в `docs/requirements.md`), поэтому стартовать с доступного: доменный аудит `event_action_logs`, `docs/deploy-log.md`, release notes, ручная обратная связь. Артефакт на выходе — предложенные пункты `FM-<n>` и правки правил/промптов.
+
+**Не делать.** Не поднимать observability-стек (Grafana/OTel/метрики) в рамках этого пункта — это отдельная инфраструктурная работа; агент работает с тем, что уже есть.
+
+---
+
+## FM-18 — Выделить продукто-независимый pdlc-framework
+
+| | |
+|---|---|
+| **Ключ** | `FM-18` |
+| **Change (черновик)** | `pdlc-framework-extract` |
+| **Статус** | `ready` |
+| **Приоритет** | `Средний` |
+| **Модули** | `.agents/`, `build-feature/`, `discovery/`, `openspec/` |
+| **Зависит от** | `FM-16` (схемы гейтов должны устояться до выноса ядра) |
+| **Откуда** | follow-up из проектирования PDLC / discovery-воркфлоу |
+
+**Что сделать.** Вынести продукто-независимое ядро PDLC в отдельный `pdlc-framework/` для переиспользования в разных продуктах: движок оркестратора, схемы гейтов, шаблоны артефактов (PRD/ADR/Discovery Brief/evidence), цикл SCOPE-V. Продукто-специфичное (модули, hexagonal-checklist ADR-001, команды mvn/npm, backlog-конвенции) остаётся в repo-адаптере, который подключает ядро. Цель — «Global Standard, Local Context»: общий фреймворк + локальная настройка под конкретный продукт.
+
+**Не делать.** Не делать это до стабилизации `FM-16`; не ломать текущие `/discovery` и `/build-feature` при выносе (сначала извлечь, потом переключить репо на использование ядра).
+
+---
+
 ## Как добавлять пункты
 
 1. Заголовок + ключ `FM-<n>` (следующий свободный номер). Если есть тикет Jira — указать `WISLA-<n>` отдельно, не подменять им `FM-<n>`.

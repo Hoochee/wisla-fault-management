@@ -77,6 +77,18 @@ public class EventJpaEntity {
     @Column(name = "closed_at")
     private Instant closedAt;
 
+    @Column(name = "acknowledged_at")
+    private Instant acknowledgedAt;
+
+    @Column(name = "acknowledged_by_user_id")
+    private UUID acknowledgedByUserId;
+
+    @Column(name = "silenced_until")
+    private Instant silencedUntil;
+
+    @Column(name = "silenced_by_user_id")
+    private UUID silencedByUserId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -192,6 +204,22 @@ public class EventJpaEntity {
         this.closedAt = closedAt;
     }
 
+    public void setAcknowledgedAt(Instant acknowledgedAt) {
+        this.acknowledgedAt = acknowledgedAt;
+    }
+
+    public void setAcknowledgedByUserId(UUID acknowledgedByUserId) {
+        this.acknowledgedByUserId = acknowledgedByUserId;
+    }
+
+    public void setSilencedUntil(Instant silencedUntil) {
+        this.silencedUntil = silencedUntil;
+    }
+
+    public void setSilencedByUserId(UUID silencedByUserId) {
+        this.silencedByUserId = silencedByUserId;
+    }
+
     public String getStatus() {
         return status;
     }
@@ -274,6 +302,22 @@ public class EventJpaEntity {
 
     public Instant getClosedAt() {
         return closedAt;
+    }
+
+    public Instant getAcknowledgedAt() {
+        return acknowledgedAt;
+    }
+
+    public UUID getAcknowledgedByUserId() {
+        return acknowledgedByUserId;
+    }
+
+    public Instant getSilencedUntil() {
+        return silencedUntil;
+    }
+
+    public UUID getSilencedByUserId() {
+        return silencedByUserId;
     }
 
     public Instant getCreatedAt() {

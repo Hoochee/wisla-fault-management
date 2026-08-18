@@ -3,13 +3,18 @@ package ru.wisla.fm.processing.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
+import ru.wisla.fm.processing.adapter.out.persistence.EventJpaEntity;
+import ru.wisla.fm.processing.adapter.out.persistence.EventJpaRepository;
 import ru.wisla.fm.support.AbstractFmModuleTest;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -19,14 +24,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class EventControllerTest extends AbstractFmModuleTest {
 
+  @Autowired private EventJpaRepository eventJpaRepository;
+
   private String adminToken;
   private String eventId;
+  private String eventTitle;
 
   @BeforeEach
   void setUp() throws Exception {
     adminToken = obtainAdminToken();
-    ingestSampleEvent();
-    eventId = fetchFirstEventId();
+    eventTitle = "DutyEvent-" + System.nanoTime();
+    ingestEvent(eventTitle, "critical", "evt-" + System.nanoTime());
+    eventId = fetchEventIdByTitle(eventTitle);
   }
 
   @Test
@@ -50,7 +59,7 @@ class EventControllerTest extends AbstractFmModuleTest {
         .perform(get("/api/v1/events/" + eventId).header("Authorization", bearer(adminToken)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.event.id").value(eventId))
-        .andExpect(jsonPath("$.event.title").value("Test disk full"))
+        .andExpect(jsonPath("$.event.title").value(eventTitle))
         .andExpect(jsonPath("$.actionLogs").isArray());
   }
 
@@ -199,8 +208,400 @@ class EventControllerTest extends AbstractFmModuleTest {
         .andExpect(jsonPath("$.logEntry.action").value("close"));
   }
 
-  private void ingestSampleEvent() throws Exception {
-    ingestEvent("Test disk full", "critical", "evt-" + System.nanoTime());
+  @Test
+  void ackKeepsStatusAndWritesAuditColumns() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("action", "ack"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.event.status").value("new"))
+        .andExpect(jsonPath("$.event.closedAt").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$.event.acknowledgedAt").exists())
+        .andExpect(jsonPath("$.event.acknowledgedByUserId").exists())
+        .andExpect(jsonPath("$.logEntry.action").value("ack"));
+
+    MvcResult listed =
+        mockMvc
+            .perform(get("/api/v1/events").param("size", "500").header("Authorization", bearer(adminToken)))
+            .andExpect(status().isOk())
+            .andReturn();
+    org.assertj.core.api.Assertions.assertThat(indexOfIdOrMissing(
+            objectMapper.readTree(listed.getResponse().getContentAsString()).get("items"), eventId))
+        .isGreaterThanOrEqualTo(0);
+  }
+
+  @Test
+  void repeatAckUpdatesTimestamp() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("action", "ack"))))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("action", "ack"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.event.acknowledgedAt").exists())
+        .andExpect(jsonPath("$.logEntry.action").value("ack"));
+  }
+
+  @Test
+  void ackOnClosedOrArchivedReturns409() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("action", "close"))))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("action", "ack"))))
+        .andExpect(status().isConflict());
+
+    String archivedId = ingestNamedEvent("AckArchived-" + System.nanoTime());
+    mockMvc
+        .perform(
+            patch("/api/v1/events/" + archivedId)
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("status", "archived"))))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + archivedId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("action", "ack"))))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  void commentSucceedsAndBlankCommentReturns400() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    Map.of("action", "comment", "comment", "looking into it"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.event.status").value("new"))
+        .andExpect(jsonPath("$.logEntry.action").value("comment"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("action", "comment"))))
+        .andExpect(status().isBadRequest());
+
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("action", "comment", "comment", "   "))))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void assignColleagueKeepsStatusWithoutInProgress() throws Exception {
+    String colleagueId = createActiveUser("assign-col");
+
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    Map.of("action", "assign", "assignedUserId", colleagueId))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.event.status").value("new"))
+        .andExpect(jsonPath("$.event.assignedUserId").value(colleagueId))
+        .andExpect(jsonPath("$.event.assignedUserName").value("Assign Colleague"))
+        .andExpect(jsonPath("$.logEntry.action").value("assign"));
+  }
+
+  @Test
+  void takeStillSetsInProgressAfterAssignApi() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("action", "take"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.event.status").value("in_progress"))
+        .andExpect(jsonPath("$.event.assignedUserId").exists())
+        .andExpect(jsonPath("$.event.takenAt").exists())
+        .andExpect(jsonPath("$.logEntry.action").value("take"));
+  }
+
+  @Test
+  void assignWithoutUserIdUnknownAndInactiveAreRejected() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("action", "assign"))))
+        .andExpect(status().isBadRequest());
+
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    Map.of("action", "assign", "assignedUserId", "00000000-0000-0000-0000-000000000099"))))
+        .andExpect(status().isNotFound());
+
+    String inactiveId = createActiveUser("assign-idle");
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/users/" + inactiveId)
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("active", false))))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    Map.of("action", "assign", "assignedUserId", inactiveId))))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void silenceSetsUntilAndRejectsBadMinutesAndClosed() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    Map.of("action", "silence", "silenceMinutes", 30))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.event.status").value("new"))
+        .andExpect(jsonPath("$.event.severity").value("critical"))
+        .andExpect(jsonPath("$.event.silencedUntil").exists())
+        .andExpect(jsonPath("$.logEntry.action").value("silence"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("action", "silence"))))
+        .andExpect(status().isBadRequest());
+
+    Map<String, Object> zeroMinutes = new HashMap<>();
+    zeroMinutes.put("action", "silence");
+    zeroMinutes.put("silenceMinutes", 0);
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(zeroMinutes)))
+        .andExpect(status().isBadRequest());
+
+    String closedId = ingestNamedEvent("SilenceClosed-" + System.nanoTime());
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + closedId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("action", "close"))))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + closedId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    Map.of("action", "silence", "silenceMinutes", 15))))
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  void takeAndCloseRemainAllowedOnSilencedEvent() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    Map.of("action", "silence", "silenceMinutes", 15))))
+        .andExpect(status().isOk());
+
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("action", "take"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.event.status").value("in_progress"));
+
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("action", "close"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.event.status").value("closed"));
+  }
+
+  @Test
+  void listHidesSilencedEventsUnlessRequestedAndDetailAlwaysReturns() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    Map.of("action", "silence", "silenceMinutes", 60))))
+        .andExpect(status().isOk());
+
+    MvcResult hidden =
+        mockMvc
+            .perform(
+                get("/api/v1/events")
+                    .param("size", "500")
+                    .header("Authorization", bearer(adminToken)))
+            .andExpect(status().isOk())
+            .andReturn();
+    org.assertj.core.api.Assertions.assertThat(indexOfIdOrMissing(
+            objectMapper.readTree(hidden.getResponse().getContentAsString()).get("items"), eventId))
+        .isEqualTo(-1);
+
+    MvcResult explicitFalse =
+        mockMvc
+            .perform(
+                get("/api/v1/events")
+                    .param("includeSilenced", "false")
+                    .param("size", "500")
+                    .header("Authorization", bearer(adminToken)))
+            .andExpect(status().isOk())
+            .andReturn();
+    org.assertj.core.api.Assertions.assertThat(indexOfIdOrMissing(
+            objectMapper.readTree(explicitFalse.getResponse().getContentAsString()).get("items"), eventId))
+        .isEqualTo(-1);
+
+    mockMvc
+        .perform(
+            get("/api/v1/events")
+                .param("includeSilenced", "true")
+                .param("size", "500")
+                .header("Authorization", bearer(adminToken)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[?(@.id=='" + eventId + "')].silencedUntil").exists());
+
+    mockMvc
+        .perform(get("/api/v1/events/" + eventId).header("Authorization", bearer(adminToken)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.event.id").value(eventId))
+        .andExpect(jsonPath("$.event.silencedUntil").exists());
+  }
+
+  @Test
+  void expiredSilenceReturnsToTheActiveList() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/events/" + eventId + "/actions")
+                .header("Authorization", bearer(adminToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    Map.of("action", "silence", "silenceMinutes", 60))))
+        .andExpect(status().isOk());
+
+    EventJpaEntity entity = eventJpaRepository.findById(UUID.fromString(eventId)).orElseThrow();
+    entity.setSilencedUntil(Instant.now().minusSeconds(60));
+    eventJpaRepository.saveAndFlush(entity);
+
+    MvcResult listed =
+        mockMvc
+            .perform(
+                get("/api/v1/events")
+                    .param("size", "500")
+                    .header("Authorization", bearer(adminToken)))
+            .andExpect(status().isOk())
+            .andReturn();
+    org.assertj.core.api.Assertions.assertThat(indexOfIdOrMissing(
+            objectMapper.readTree(listed.getResponse().getContentAsString()).get("items"), eventId))
+        .isGreaterThanOrEqualTo(0);
+  }
+
+  private String ingestNamedEvent(String title) throws Exception {
+    ingestEvent(title, "critical", "evt-" + System.nanoTime());
+    return fetchEventIdByTitle(title);
+  }
+
+  private String createActiveUser(String loginPrefix) throws Exception {
+    String suffix = UUID.randomUUID().toString().substring(0, 8);
+    String login = loginPrefix + "-" + suffix;
+    String roleId = firstRoleId(adminToken);
+    MvcResult created =
+        mockMvc
+            .perform(
+                post("/api/v1/admin/users")
+                    .header("Authorization", bearer(adminToken))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        objectMapper.writeValueAsString(
+                            Map.of(
+                                "login",
+                                login,
+                                "fullName",
+                                "Assign Colleague",
+                                "email",
+                                login + "@wisla.local",
+                                "password",
+                                "secret123",
+                                "roleIds",
+                                List.of(roleId)))))
+            .andExpect(status().isCreated())
+            .andReturn();
+    return objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asText();
+  }
+
+  private String firstRoleId(String token) throws Exception {
+    MvcResult roles =
+        mockMvc
+            .perform(get("/api/v1/admin/roles").header("Authorization", bearer(token)))
+            .andExpect(status().isOk())
+            .andReturn();
+    return objectMapper.readTree(roles.getResponse().getContentAsString()).get(0).get("id").asText();
+  }
+
+  private int indexOfIdOrMissing(JsonNode items, String id) {
+    for (int i = 0; i < items.size(); i++) {
+      if (id.equals(items.get(i).get("id").asText())) {
+        return i;
+      }
+    }
+    return -1;
   }
 
   private void ingestEvent(String title, String severity, String externalId) throws Exception {
@@ -239,18 +640,17 @@ class EventControllerTest extends AbstractFmModuleTest {
     throw new AssertionError("Event not found: " + title);
   }
 
-  private String fetchFirstEventId() throws Exception {
+  private String fetchEventIdByTitle(String title) throws Exception {
     MvcResult result =
         mockMvc
-            .perform(get("/api/v1/events").header("Authorization", bearer(adminToken)))
+            .perform(
+                get("/api/v1/events")
+                    .param("includeSilenced", "true")
+                    .param("size", "500")
+                    .header("Authorization", bearer(adminToken)))
             .andExpect(status().isOk())
             .andReturn();
-    JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
-    for (JsonNode item : body.get("items")) {
-      if ("Test disk full".equals(item.get("title").asText())) {
-        return item.get("id").asText();
-      }
-    }
-    return body.get("items").get(0).get("id").asText();
+    JsonNode items = objectMapper.readTree(result.getResponse().getContentAsString()).get("items");
+    return items.get(indexOfTitle(items, title)).get("id").asText();
   }
 }
