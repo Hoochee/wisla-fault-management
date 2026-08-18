@@ -44,7 +44,11 @@ Run at the beginning of `/build-feature` when `.feature-state.json` does not exi
    ```
    If change already exists — ask user to continue or pick another name.
 
-5. **Create state file**
+5. **Resolve risk level (`riskLevel`)**
+   - If the item originates from `/discovery` — an `FM-<n>` with a linked Discovery Brief at `openspec/discovery/<slug>/problem.md` (also recorded in `openspec/discovery/<slug>/.discovery-state.json` as `riskLevel`) — read its **Risk level (L0–L4)** and set `state.riskLevel` to that value. See [`../discovery/references/risk-levels.md`](../discovery/references/risk-levels.md).
+   - If there is no Discovery Brief / the level is unknown — set `"riskLevel": null`. It is treated as **`L2`** at review time. If the change later looks L3/L4 (Liquibase/OpenAPI, auth/security, event-processing correctness), the orchestrator may ask the user to confirm the level before the review phase.
+
+6. **Create state file**
 
    Write `openspec/changes/<changeName>/.feature-state.json`:
 
@@ -54,6 +58,7 @@ Run at the beginning of `/build-feature` when `.feature-state.json` does not exi
      "jiraKey": "WISLA-12345",
      "changeName": "my-feature",
      "branch": "feature/WISLA-12345",
+     "riskLevel": null,
      "modules": [],
      "approvals": {
        "scope": false,
@@ -70,17 +75,21 @@ Run at the beginning of `/build-feature` when `.feature-state.json` does not exi
        "frontend": 0
      },
      "codeReview": {
-       "backend": { "status": "pending", "iterations": 0 },
-       "frontend": { "status": "pending", "iterations": 0 }
+       "backend": { "status": "pending", "iterations": 0, "reviewers": {} },
+       "frontend": { "status": "pending", "iterations": 0, "reviewers": {} }
      }
    }
    ```
 
    For a backlog item without Jira, set `"jiraKey": "FM-<n>"` and `"branch": "feature/FM-<n>"` (same field, no browse URL).
 
+   `riskLevel` is `"L0"`..`"L4"` from the Discovery Brief, or `null` (⇒ treated as `L2` at review time). It selects which parallel review specialists run — see `orchestrator-playbook.md#risk-gated-specialists`.
+
+   `codeReview.<scope>.reviewers` starts empty and is filled during the review phase with reviewer verdicts (`quality`/`security`/`db-api`/`perf` → `approved|changes_requested|skipped`).
+
    `tests.frontend_e2e` tracks Playwright e2e (mandatory alongside Vitest whenever frontend is in scope — see `orchestrator-playbook.md#frontend-test-gate`).
 
-6. Advance `phase` to `discovery` and report to user:
+7. Advance `phase` to `discovery` and report to user:
    - branch name
    - change path: `openspec/changes/<changeName>/`
    - next step: discovery questions or delegate System Analyst

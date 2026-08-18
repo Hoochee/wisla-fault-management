@@ -62,7 +62,9 @@ cd frontend && npm run test:e2e
 ## AI workflow
 
 - OpenSpec: `/opsx:explore`, `/opsx:propose`, `/opsx:apply`, `/opsx:sync`, `/opsx:archive`
+- Upstream product discovery: `/discovery` (see `discovery/`, `.agents/discovery-*.md`) — turns a Jira epic or a free-text idea into a reviewed Discovery Brief + a `ready` `FM-<n>` backlog item; does **not** create a branch or an OpenSpec change
 - Full feature orchestration: `/build-feature` (see `build-feature/`, `.agents/`, `openspec/TEAM.md`)
+- Two-workflow topology: `/discovery` (upstream PDLC) → [`BACKLOG.md`](BACKLOG.md) (`FM-<n>`, the typed seam) → `/build-feature` (delivery)
 - Deferred work: [`BACKLOG.md`](BACKLOG.md) — consult when the user asks for the next task or a backlog item (`FM-<n>` is the workflow key when there is no Jira ticket)
 - Prefer TDD and existing module boundaries; do not invent new top-level services without approval
 

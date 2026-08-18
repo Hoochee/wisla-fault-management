@@ -60,7 +60,11 @@ Task:
 
 Launch up to 4 Tasks; queue remaining modules from `state.modules`.
 
-### Code Reviewer (after backend or frontend implementation)
+### Review stage — parallel, risk-gated (after backend or frontend implementation)
+
+The `backend_review` / `frontend_review` phase spawns **Code Quality (09) plus the applicable specialists (12/13/14) in ONE message, multiple Task calls** (max 4 concurrent). Which specialists run is decided by `state.riskLevel` + area triggers — see [orchestrator-playbook.md#risk-gated-specialists](../orchestrator-playbook.md#risk-gated-specialists) and [`../../discovery/references/risk-levels.md`](../../discovery/references/risk-levels.md). All reviewers are read-only (enforced by their prompts) and emit the **same verdict contract**.
+
+#### Code Reviewer — Code Quality (always)
 
 ```
 Task:
@@ -74,7 +78,54 @@ Task:
     prior_findings: (optional — from last review when re-reviewing)
 ```
 
-Parse `VERDICT` from response. If `changes_requested` and `codeReview.<scope>.iterations` ≤ 3 — re-delegate 07 or 10 with blocking findings, then re-run 09. If > 3 — escalate to user.
+#### Security Reviewer (id `security`) — gated
+
+```
+Task:
+  subagent_type: generalPurpose
+  readonly: true
+  prompt: |
+    {contents of .agents/12-security-reviewer.md}
+
+    reviewScope: backend | frontend
+    riskLevel: {riskLevel}
+    {context block}
+    prior_findings: (optional — from last review when re-reviewing)
+```
+
+#### DB / API Contract Reviewer (id `db-api`) — gated
+
+```
+Task:
+  subagent_type: generalPurpose
+  readonly: true
+  prompt: |
+    {contents of .agents/13-db-api-reviewer.md}
+
+    reviewScope: backend | frontend
+    riskLevel: {riskLevel}
+    {context block}
+    prior_findings: (optional — from last review when re-reviewing)
+```
+
+#### Performance / FinOps Reviewer (id `perf`) — gated
+
+```
+Task:
+  subagent_type: generalPurpose
+  readonly: true
+  prompt: |
+    {contents of .agents/14-performance-reviewer.md}
+
+    reviewScope: backend | frontend
+    riskLevel: {riskLevel}
+    {context block}
+    prior_findings: (optional — from last review when re-reviewing)
+```
+
+**Spawn rule:** always spawn 09; spawn 12/13/14 per the gating table. Each specialist self-gates via its "Applies when" rule and returns `SUMMARY: not applicable` (record as `skipped`) when its area is not touched — so spawning uniformly is safe.
+
+**Aggregation:** parse `VERDICT` from every response and record it in `codeReview.<scope>.reviewers[<id>]`. Scope `status = approved` only if every spawned reviewer is `approved`/`skipped`. If **any** is `changes_requested` and `codeReview.<scope>.iterations` ≤ 3 — re-delegate 07 or 10 once with the **union** of all `BLOCKING_FINDINGS`, then re-run this whole parallel stage. If > 3 — escalate to user. For `riskLevel === L4`, require an explicit human decision before advancing even when all reviewers approve.
 
 ### Backend Test Engineer
 
