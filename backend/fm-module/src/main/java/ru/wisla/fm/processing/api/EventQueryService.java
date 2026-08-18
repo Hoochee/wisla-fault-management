@@ -19,6 +19,7 @@ import ru.wisla.fm.processing.adapter.out.persistence.EventActionLogJpaRepositor
 import ru.wisla.fm.processing.adapter.out.persistence.EventJpaEntity;
 import ru.wisla.fm.processing.adapter.out.persistence.EventJpaRepository;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -51,12 +52,13 @@ public class EventQueryService {
         this.objectMapper = objectMapper;
     }
 
-    public EventPage listEvents(String status, String severity, UUID sourceId, UUID ciId, String sort, int page, int size) {
+    public EventPage listEvents(String status, String severity, UUID sourceId, UUID ciId,
+                                boolean includeSilenced, String sort, int page, int size) {
         ParsedSort parsedSort = parseSort(sort);
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 500);
 
-        Specification<EventJpaEntity> spec = buildSpec(status, severity, sourceId, ciId);
+        Specification<EventJpaEntity> spec = buildSpec(status, severity, sourceId, ciId, includeSilenced);
         PageRequest pageable;
         if ("severity".equals(parsedSort.field())) {
             spec = spec.and(severitySortSpec(parsedSort.ascending()));
@@ -124,7 +126,11 @@ public class EventQueryService {
                 event.getLastRepeatAt(),
                 event.getTakenAt(),
                 event.getClosedAt(),
-                event.getUpdatedAt()
+                event.getUpdatedAt(),
+                event.getAcknowledgedAt(),
+                event.getAcknowledgedByUserId(),
+                event.getSilencedUntil(),
+                event.getSilencedByUserId()
         );
     }
 
@@ -151,7 +157,8 @@ public class EventQueryService {
         }
     }
 
-    private Specification<EventJpaEntity> buildSpec(String status, String severity, UUID sourceId, UUID ciId) {
+    private Specification<EventJpaEntity> buildSpec(String status, String severity, UUID sourceId, UUID ciId,
+                                                    boolean includeSilenced) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (status != null && !status.isBlank()) {
@@ -165,6 +172,12 @@ public class EventQueryService {
             }
             if (ciId != null) {
                 predicates.add(cb.equal(root.get("ciId"), ciId));
+            }
+            if (!includeSilenced) {
+                Instant now = Instant.now();
+                predicates.add(cb.or(
+                        cb.isNull(root.get("silencedUntil")),
+                        cb.lessThanOrEqualTo(root.get("silencedUntil"), now)));
             }
             return cb.and(predicates.toArray(Predicate[]::new));
         };

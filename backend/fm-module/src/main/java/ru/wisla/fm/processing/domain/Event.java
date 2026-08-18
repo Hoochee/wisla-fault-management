@@ -35,6 +35,10 @@ public class Event {
     private Instant lastRepeatAt;
     private Instant takenAt;
     private Instant closedAt;
+    private Instant acknowledgedAt;
+    private UUID acknowledgedByUserId;
+    private Instant silencedUntil;
+    private UUID silencedByUserId;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -92,6 +96,47 @@ public class Event {
 
     public void assignRoot(UUID rootId) {
         rootEventId = rootId;
+    }
+
+    public void acknowledge(Instant now, UUID actorUserId) {
+        rejectIfTerminal("Cannot acknowledge closed or archived event");
+        acknowledgedAt = now;
+        acknowledgedByUserId = actorUserId;
+    }
+
+    public void assignTo(UUID userId) {
+        assignedUserId = userId;
+    }
+
+    public void silenceUntil(Instant until, UUID actorUserId) {
+        rejectIfTerminal("Cannot silence closed or archived event");
+        silencedUntil = until;
+        silencedByUserId = actorUserId;
+    }
+
+    public void take(Instant now, UUID actorUserId) {
+        rejectIfTerminal("Cannot take closed or archived event");
+        status = "in_progress";
+        assignedUserId = actorUserId;
+        takenAt = now;
+    }
+
+    public void close(Instant now) {
+        if ("closed".equals(status)) {
+            throw new IllegalStateException("Event is already closed");
+        }
+        status = "closed";
+        closedAt = now;
+    }
+
+    public boolean isSilenced(Instant now) {
+        return silencedUntil != null && silencedUntil.isAfter(now);
+    }
+
+    private void rejectIfTerminal(String message) {
+        if ("closed".equals(status) || "archived".equals(status)) {
+            throw new IllegalStateException(message);
+        }
     }
 
     public UUID getId() {
@@ -260,6 +305,38 @@ public class Event {
 
     public void setClosedAt(Instant closedAt) {
         this.closedAt = closedAt;
+    }
+
+    public Instant getAcknowledgedAt() {
+        return acknowledgedAt;
+    }
+
+    public void setAcknowledgedAt(Instant acknowledgedAt) {
+        this.acknowledgedAt = acknowledgedAt;
+    }
+
+    public UUID getAcknowledgedByUserId() {
+        return acknowledgedByUserId;
+    }
+
+    public void setAcknowledgedByUserId(UUID acknowledgedByUserId) {
+        this.acknowledgedByUserId = acknowledgedByUserId;
+    }
+
+    public Instant getSilencedUntil() {
+        return silencedUntil;
+    }
+
+    public void setSilencedUntil(Instant silencedUntil) {
+        this.silencedUntil = silencedUntil;
+    }
+
+    public UUID getSilencedByUserId() {
+        return silencedByUserId;
+    }
+
+    public void setSilencedByUserId(UUID silencedByUserId) {
+        this.silencedByUserId = silencedByUserId;
     }
 
     public Instant getCreatedAt() {

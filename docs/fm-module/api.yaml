@@ -192,6 +192,14 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: includeSilenced
+          in: query
+          description: |
+            When `false` (default), omit events whose `silencedUntil` is in the future.
+            When `true`, include currently silenced events.
+          schema:
+            type: boolean
+            default: false
         - name: createdFrom
           in: query
           schema:
@@ -2081,7 +2089,7 @@ components:
 
     EventActionType:
       type: string
-      enum: [take, close, comment, defer, maintenance]
+      enum: [take, close, comment, ack, assign, silence, defer, maintenance]
 
     HealthStatus:
       type: object
@@ -2429,6 +2437,18 @@ components:
         updatedAt:
           type: string
           format: date-time
+        acknowledgedAt:
+          type: string
+          format: date-time
+        acknowledgedByUserId:
+          type: string
+          format: uuid
+        silencedUntil:
+          type: string
+          format: date-time
+        silencedByUserId:
+          type: string
+          format: uuid
 
     EventDetail:
       allOf:
@@ -2517,7 +2537,10 @@ components:
         assignedUserId:
           type: string
           format: uuid
-          description: Override assignee for `take`
+          description: Required for `assign`; not used as an override for `take`
+        silenceMinutes:
+          type: integer
+          description: Required for `silence`; any integer greater than 0
 
     EventActionResult:
       type: object

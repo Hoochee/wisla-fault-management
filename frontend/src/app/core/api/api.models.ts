@@ -9,7 +9,7 @@ export type AdapterRuntimeStatus = 'running' | 'stopped' | 'idle' | 'degraded' |
 export type RuleType = 'dedup' | 'problem_resolution' | 'correlation' | 'threshold';
 export type ApprovalStatus = 'approved' | 'pending' | 'draft';
 export type HealthLevel = 'fatal' | 'critical' | 'major' | 'warning' | 'ok' | 'unknown';
-export type EventActionType = 'take' | 'close' | 'comment' | 'defer' | 'maintenance';
+export type EventActionType = 'take' | 'close' | 'comment' | 'ack' | 'assign' | 'silence' | 'defer' | 'maintenance';
 
 export interface PageMeta {
   page: number;
@@ -109,6 +109,10 @@ export interface Event {
   takenAt?: string;
   closedAt?: string;
   updatedAt?: string;
+  acknowledgedAt?: string;
+  acknowledgedByUserId?: string;
+  silencedUntil?: string;
+  silencedByUserId?: string;
 }
 
 export interface EventAttribute {

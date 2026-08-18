@@ -28,6 +28,10 @@ public record EventDto(
         Instant lastRepeatAt,
         Instant takenAt,
         Instant closedAt,
-        Instant updatedAt
+        Instant updatedAt,
+        Instant acknowledgedAt,
+        UUID acknowledgedByUserId,
+        Instant silencedUntil,
+        UUID silencedByUserId
 ) {
 }

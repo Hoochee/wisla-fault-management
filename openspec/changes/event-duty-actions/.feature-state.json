@@ -1,0 +1,28 @@
+{
+  "phase": "review",
+  "jiraKey": "FM-10",
+  "changeName": "event-duty-actions",
+  "branch": "feature/FM-10",
+  "modules": [
+    "backend/fm-module",
+    "frontend/"
+  ],
+  "approvals": {
+    "scope": true,
+    "artifacts": true,
+    "readyForPr": false
+  },
+  "tests": {
+    "backend": "passed",
+    "frontend": "passed",
+    "frontend_e2e": "passed"
+  },
+  "testFixIterations": {
+    "backend": 0,
+    "frontend": 1
+  },
+  "codeReview": {
+    "backend": { "status": "approved", "iterations": 0 },
+    "frontend": { "status": "approved", "iterations": 0 }
+  }
+}
