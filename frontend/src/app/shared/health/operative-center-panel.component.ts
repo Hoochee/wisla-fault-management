@@ -46,7 +46,7 @@ type Tab = 'signals' | 'health' | 'params' | 'events';
 
         <div class="content">
           @if (activeTab === 'health') {
-            <app-ci-health-tab [ci]="selectedCi" [health]="health" />
+            <app-ci-health-tab [ci]="selectedCi" [health]="health" [productId]="product.id" />
           }
           @if (activeTab === 'signals') {
             <div class="card">
@@ -63,7 +63,7 @@ type Tab = 'signals' | 'health' | 'params' | 'events';
                   <p class="muted">Нет активных сигналов</p>
                 }
               </div>
-              <a [routerLink]="['/console']" [queryParams]="{ ci: selectedCi.id }" class="link">Открыть в консоли →</a>
+              <a [routerLink]="['/console']" [queryParams]="{ ciId: selectedCi.id }" class="link">Открыть в консоли →</a>
             </div>
           }
           @if (activeTab === 'params') {
@@ -89,7 +89,7 @@ type Tab = 'signals' | 'health' | 'params' | 'events';
             <div class="card">
               <div class="card-head">
                 <h3>События КЕ</h3>
-                <a [routerLink]="['/console']" [queryParams]="{ ci: selectedCi.id }" class="link">Консоль →</a>
+                <a [routerLink]="['/console']" [queryParams]="{ ciId: selectedCi.id }" class="link">Консоль →</a>
               </div>
               <div class="signal-list">
                 @for (e of ciAllEvents; track e.id) {

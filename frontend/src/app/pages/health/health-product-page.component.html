@@ -12,6 +12,7 @@
         </p>
       </div>
       <div class="top-actions">
+        <a [routerLink]="['/console']" [queryParams]="{ productId: product.id }" class="btn">В консоль</a>
         @if (isAdmin()) {
           <button type="button" class="btn" (click)="openEditProduct()">Редактировать</button>
           <button type="button" class="btn" (click)="openWeightModal()">Веса компонентов</button>

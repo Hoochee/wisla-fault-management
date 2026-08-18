@@ -342,6 +342,9 @@ export class ConsolePageComponent implements OnInit, OnDestroy {
 
       this.applySeverityQueryParam(params.get('severity'));
 
+      this.applyProductIdQueryParam(params.get('productId'));
+      this.applyCiIdQueryParam(params.get('ciId'));
+
       if (this.listeningForQueryChanges) {
 
         this.loadEvents();
@@ -531,6 +534,49 @@ export class ConsolePageComponent implements OnInit, OnDestroy {
       ],
 
     }));
+
+  }
+
+
+
+  private applyProductIdQueryParam(productId: string | null): void {
+
+    if (!this.isRfc4122Uuid(productId)) {
+
+      return;
+
+    }
+
+    this.filter.update((current) => ({
+
+      ...current,
+
+      chips: [
+
+        ...current.chips.filter((chip) => chip.field !== 'productId'),
+
+        { id: 'productId-query', field: 'productId', operator: 'eq', value: productId },
+      ],
+    }));
+  }
+
+  private applyCiIdQueryParam(ciId: string | null): void {
+    if (!this.isRfc4122Uuid(ciId)) {
+      return;
+    }
+
+    this.filter.update((current) => ({
+      ...current,
+      chips: [
+        ...current.chips.filter((chip) => chip.field !== 'ciId'),
+        { id: 'ciId-query', field: 'ciId', operator: 'eq', value: ciId },
+      ],
+    }));
+  }
+
+  private isRfc4122Uuid(value: string | null): value is string {
+
+    return !!value && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 
   }
 

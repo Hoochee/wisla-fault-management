@@ -43,13 +43,14 @@ public class EventController {
             @RequestParam(required = false) String severity,
             @RequestParam(required = false) UUID sourceId,
             @RequestParam(required = false) UUID ciId,
+            @RequestParam(required = false) UUID productId,
             @RequestParam(defaultValue = "false") boolean includeSilenced,
             @RequestParam(required = false) String sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size
     ) {
         return eventQueryService.listEvents(
-                status, severity, sourceId, ciId, includeSilenced, sort, page, size);
+                status, severity, sourceId, ciId, productId, includeSilenced, sort, page, size);
     }
 
     @GetMapping("/{id}")

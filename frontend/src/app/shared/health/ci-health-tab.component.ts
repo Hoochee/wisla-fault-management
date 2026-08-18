@@ -69,7 +69,7 @@ import { SeverityBadgeComponent } from '../severity-badge/severity-badge.compone
               <span>{{ health.signalsBySeverity[s] }}</span>
             </div>
           }
-          <a [routerLink]="['/console']" [queryParams]="{ ci: ci.id }" class="link">Перейти к сигналам →</a>
+          <a [routerLink]="['/console']" [queryParams]="{ productId: productId }" class="link">Перейти к сигналам →</a>
         </div>
       </div>
 
@@ -187,6 +187,7 @@ import { SeverityBadgeComponent } from '../severity-badge/severity-badge.compone
 export class CiHealthTabComponent {
   @Input({ required: true }) ci!: ConfigurationItem;
   @Input({ required: true }) health!: CiHealthProfile;
+  @Input({ required: true }) productId!: string;
 
   rcaOpen = false;
   damageThreshold = 30;

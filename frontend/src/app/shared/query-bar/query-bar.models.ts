@@ -1,4 +1,4 @@
-export type QueryField = 'severity' | 'status' | 'title';
+export type QueryField = 'severity' | 'status' | 'title' | 'productId' | 'ciId';
 export type QueryOperator = 'eq' | 'ne';
 
 export interface QueryChip {
@@ -19,6 +19,8 @@ export const QUERY_FIELD_LABELS: Record<QueryField, string> = {
   severity: 'severity',
   status: 'status',
   title: 'title',
+  productId: 'productId',
+  ciId: 'ciId',
 };
 
 export const SEVERITY_OPTIONS = ['fatal', 'critical', 'major', 'minor', 'warning', 'normal'] as const;

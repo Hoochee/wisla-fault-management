@@ -64,6 +64,8 @@ export function buildEventApiParams(
   for (const chip of filter.chips) {
     if (chip.operator === 'eq' && chip.field === 'status') params['status'] = chip.value;
     if (chip.operator === 'eq' && chip.field === 'severity') params['severity'] = chip.value;
+    if (chip.operator === 'eq' && chip.field === 'productId') params['productId'] = chip.value;
+    if (chip.operator === 'eq' && chip.field === 'ciId') params['ciId'] = chip.value;
   }
   if (filter.textSearch) params['query'] = filter.textSearch;
   if (filter.from) params['from'] = filter.from;

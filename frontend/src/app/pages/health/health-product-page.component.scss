@@ -18,6 +18,11 @@
   gap: 0.5rem;
 }
 
+.top-actions a.btn {
+  text-decoration: none;
+  display: inline-block;
+}
+
 .code {
   font-family: var(--font-mono, monospace);
   color: var(--text-secondary);
