@@ -8,6 +8,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import ru.wisla.fm.cmdb.persistence.ProductCiRepository;
 import ru.wisla.fm.common.api.NotFoundException;
 import ru.wisla.fm.common.api.PageMeta;
 import ru.wisla.fm.configuration.persistence.EventSourceRepository;
@@ -38,27 +39,30 @@ public class EventQueryService {
     private final EventActionLogJpaRepository eventActionLogRepository;
     private final EventSourceRepository eventSourceRepository;
     private final UserRepository userRepository;
+    private final ProductCiRepository productCiRepository;
     private final ObjectMapper objectMapper;
 
     public EventQueryService(EventJpaRepository eventRepository,
                              EventActionLogJpaRepository eventActionLogRepository,
                              EventSourceRepository eventSourceRepository,
                              UserRepository userRepository,
+                             ProductCiRepository productCiRepository,
                              ObjectMapper objectMapper) {
         this.eventRepository = eventRepository;
         this.eventActionLogRepository = eventActionLogRepository;
         this.eventSourceRepository = eventSourceRepository;
         this.userRepository = userRepository;
+        this.productCiRepository = productCiRepository;
         this.objectMapper = objectMapper;
     }
 
     public EventPage listEvents(String status, String severity, UUID sourceId, UUID ciId,
-                                boolean includeSilenced, String sort, int page, int size) {
+                                UUID productId, boolean includeSilenced, String sort, int page, int size) {
         ParsedSort parsedSort = parseSort(sort);
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 500);
 
-        Specification<EventJpaEntity> spec = buildSpec(status, severity, sourceId, ciId, includeSilenced);
+        Specification<EventJpaEntity> spec = buildSpec(status, severity, sourceId, ciId, productId, includeSilenced);
         PageRequest pageable;
         if ("severity".equals(parsedSort.field())) {
             spec = spec.and(severitySortSpec(parsedSort.ascending()));
@@ -158,7 +162,7 @@ public class EventQueryService {
     }
 
     private Specification<EventJpaEntity> buildSpec(String status, String severity, UUID sourceId, UUID ciId,
-                                                    boolean includeSilenced) {
+                                                    UUID productId, boolean includeSilenced) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (status != null && !status.isBlank()) {
@@ -172,6 +176,14 @@ public class EventQueryService {
             }
             if (ciId != null) {
                 predicates.add(cb.equal(root.get("ciId"), ciId));
+            }
+            if (productId != null) {
+                List<UUID> productCiIds = productCiRepository.findCiIdsByProductId(productId);
+                if (productCiIds.isEmpty()) {
+                    predicates.add(cb.disjunction());
+                } else {
+                    predicates.add(root.get("ciId").in(productCiIds));
+                }
             }
             if (!includeSilenced) {
                 Instant now = Instant.now();

@@ -1,0 +1,44 @@
+{
+  "phase": "done",
+  "jiraKey": "FM-21",
+  "changeName": "health-signals-product-filter",
+  "branch": "feature/FM-21",
+  "riskLevel": "L3",
+  "modules": ["frontend/", "backend/fm-module"],
+  "approvals": {
+    "scope": true,
+    "artifacts": true,
+    "readyForPr": true
+  },
+  "tests": {
+    "backend": "passed",
+    "frontend": "passed",
+    "frontend_e2e": "passed"
+  },
+  "testFixIterations": {
+    "backend": 0,
+    "frontend": 0
+  },
+  "codeReview": {
+    "backend": {
+      "status": "approved",
+      "iterations": 0,
+      "reviewers": {
+        "quality": "approved",
+        "security": "approved",
+        "db-api": "approved",
+        "perf": "skipped"
+      }
+    },
+    "frontend": {
+      "status": "approved",
+      "iterations": 0,
+      "reviewers": {
+        "quality": "approved",
+        "security": "skipped",
+        "db-api": "approved",
+        "perf": "skipped"
+      }
+    }
+  }
+}

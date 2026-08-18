@@ -44,6 +44,103 @@ class EventControllerTest extends AbstractFmModuleTest {
   }
 
   @Test
+  void listEventsByProductIdIncludesOwnCisAndExcludesOtherProducts() throws Exception {
+    String suffix = UUID.randomUUID().toString();
+    String fqdnA = "product-a-" + suffix + ".wisla.local";
+    String fqdnB = "product-b-" + suffix + ".wisla.local";
+    String ciA = createConfigurationItem(adminToken, fqdnA);
+    String ciB = createConfigurationItem(adminToken, fqdnB);
+    String productA = createProduct(adminToken, "prod-a-" + suffix.substring(0, 8));
+    String productB = createProduct(adminToken, "prod-b-" + suffix.substring(0, 8));
+    bindProductCis(adminToken, productA, ciA);
+    bindProductCis(adminToken, productB, ciB);
+
+    String titleA = "ProductA-Event-" + suffix;
+    String titleB = "ProductB-Event-" + suffix;
+    ingestEvent(titleA, "critical", "ext-a-" + suffix, fqdnA);
+    ingestEvent(titleB, "critical", "ext-b-" + suffix, fqdnB);
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                get("/api/v1/events")
+                    .param("productId", productA)
+                    .param("size", "500")
+                    .header("Authorization", bearer(adminToken)))
+            .andExpect(status().isOk())
+            .andReturn();
+    JsonNode items = objectMapper.readTree(result.getResponse().getContentAsString()).get("items");
+    org.assertj.core.api.Assertions.assertThat(indexOfTitleOrMissing(items, titleA))
+        .isGreaterThanOrEqualTo(0);
+    org.assertj.core.api.Assertions.assertThat(indexOfTitleOrMissing(items, titleB)).isEqualTo(-1);
+  }
+
+  @Test
+  void listEventsByEmptyOrUnknownProductIdReturnsEmptyPage() throws Exception {
+    String emptyProductId =
+        createProduct(adminToken, "empty-" + UUID.randomUUID().toString().substring(0, 8));
+    String unknownProductId = UUID.randomUUID().toString();
+
+    mockMvc
+        .perform(
+            get("/api/v1/events")
+                .param("productId", emptyProductId)
+                .param("size", "500")
+                .header("Authorization", bearer(adminToken)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items").isArray())
+        .andExpect(jsonPath("$.items.length()").value(0));
+
+    mockMvc
+        .perform(
+            get("/api/v1/events")
+                .param("productId", unknownProductId)
+                .param("size", "500")
+                .header("Authorization", bearer(adminToken)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items").isArray())
+        .andExpect(jsonPath("$.items.length()").value(0));
+  }
+
+  @Test
+  void listEventsAndsProductIdWithSeverity() throws Exception {
+    String suffix = UUID.randomUUID().toString();
+    String fqdnA = "and-a-" + suffix + ".wisla.local";
+    String fqdnB = "and-b-" + suffix + ".wisla.local";
+    String ciA = createConfigurationItem(adminToken, fqdnA);
+    String ciB = createConfigurationItem(adminToken, fqdnB);
+    String productA = createProduct(adminToken, "and-a-" + suffix.substring(0, 8));
+    String productB = createProduct(adminToken, "and-b-" + suffix.substring(0, 8));
+    bindProductCis(adminToken, productA, ciA);
+    bindProductCis(adminToken, productB, ciB);
+
+    String majorTitle = "AndMajor-" + suffix;
+    String criticalTitle = "AndCritical-" + suffix;
+    String otherMajorTitle = "AndOtherMajor-" + suffix;
+    ingestEvent(majorTitle, "major", "and-maj-" + suffix, fqdnA);
+    ingestEvent(criticalTitle, "critical", "and-crit-" + suffix, fqdnA);
+    ingestEvent(otherMajorTitle, "major", "and-other-" + suffix, fqdnB);
+
+    MvcResult result =
+        mockMvc
+            .perform(
+                get("/api/v1/events")
+                    .param("productId", productA)
+                    .param("severity", "major")
+                    .param("size", "500")
+                    .header("Authorization", bearer(adminToken)))
+            .andExpect(status().isOk())
+            .andReturn();
+    JsonNode items = objectMapper.readTree(result.getResponse().getContentAsString()).get("items");
+    org.assertj.core.api.Assertions.assertThat(indexOfTitleOrMissing(items, majorTitle))
+        .isGreaterThanOrEqualTo(0);
+    org.assertj.core.api.Assertions.assertThat(indexOfTitleOrMissing(items, criticalTitle))
+        .isEqualTo(-1);
+    org.assertj.core.api.Assertions.assertThat(indexOfTitleOrMissing(items, otherMajorTitle))
+        .isEqualTo(-1);
+  }
+
+  @Test
   void listEventsReturnsPage() throws Exception {
     mockMvc
         .perform(get("/api/v1/events").header("Authorization", bearer(adminToken)))
@@ -605,6 +702,11 @@ class EventControllerTest extends AbstractFmModuleTest {
   }
 
   private void ingestEvent(String title, String severity, String externalId) throws Exception {
+    ingestEvent(title, severity, externalId, "demo-server.wisla.local");
+  }
+
+  private void ingestEvent(String title, String severity, String externalId, String nodeFqdn)
+      throws Exception {
     Map<String, Object> body =
         Map.of(
             "events",
@@ -621,7 +723,7 @@ class EventControllerTest extends AbstractFmModuleTest {
                     "occurredAt",
                     Instant.now().toString(),
                     "nodeFqdn",
-                    "demo-server.wisla.local")));
+                    nodeFqdn)));
     mockMvc
         .perform(
             post("/api/v1/ingest")
@@ -629,6 +731,55 @@ class EventControllerTest extends AbstractFmModuleTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(body)))
         .andExpect(status().isAccepted());
+  }
+
+  private String createProduct(String token, String code) throws Exception {
+    Map<String, Object> create =
+        Map.of("name", "Product " + code, "code", code, "tenant", "moscow", "site", "dc1");
+    MvcResult created =
+        mockMvc
+            .perform(
+                post("/api/v1/admin/products")
+                    .header("Authorization", bearer(token))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(create)))
+            .andExpect(status().isCreated())
+            .andReturn();
+    return objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asText();
+  }
+
+  private String createConfigurationItem(String token, String fqdn) throws Exception {
+    Map<String, Object> create =
+        Map.of("fqdn", fqdn, "ciType", "node", "system", "Test System");
+    MvcResult created =
+        mockMvc
+            .perform(
+                post("/api/v1/admin/configuration-items")
+                    .header("Authorization", bearer(token))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(create)))
+            .andExpect(status().isCreated())
+            .andReturn();
+    return objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asText();
+  }
+
+  private void bindProductCis(String token, String productId, String ciId) throws Exception {
+    mockMvc
+        .perform(
+            patch("/api/v1/admin/products/" + productId)
+                .header("Authorization", bearer(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("ciIds", List.of(ciId)))))
+        .andExpect(status().isOk());
+  }
+
+  private int indexOfTitleOrMissing(JsonNode items, String title) {
+    for (int i = 0; i < items.size(); i++) {
+      if (title.equals(items.get(i).get("title").asText())) {
+        return i;
+      }
+    }
+    return -1;
   }
 
   private int indexOfTitle(JsonNode items, String title) {
