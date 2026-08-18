@@ -1,0 +1,38 @@
+{
+  "phase": "done",
+  "jiraKey": "FM-19",
+  "changeName": "dashboard-priority-filter",
+  "branch": "feature/FM-19",
+  "riskLevel": null,
+  "modules": [
+    "frontend/"
+  ],
+  "approvals": {
+    "scope": true,
+    "artifacts": true,
+    "readyForPr": true
+  },
+  "tests": {
+    "backend": "skipped",
+    "frontend": "passed",
+    "frontend_e2e": "passed"
+  },
+  "testFixIterations": {
+    "backend": 0,
+    "frontend": 1
+  },
+  "codeReview": {
+    "backend": {
+      "status": "skipped",
+      "iterations": 0,
+      "reviewers": {}
+    },
+    "frontend": {
+      "status": "approved",
+      "iterations": 0,
+      "reviewers": {
+        "quality": "approved"
+      }
+    }
+  }
+}

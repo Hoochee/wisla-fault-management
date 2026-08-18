@@ -1,6 +1,6 @@
 import { Component, inject, OnDestroy, OnInit, signal, ViewChild } from '@angular/core';
 
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { DatePipe } from '@angular/common';
 
@@ -18,7 +18,7 @@ import { StatusBadgeComponent } from '../../shared/status-badge/status-badge.com
 
 import { QueryBarComponent } from '../../shared/query-bar/query-bar.component';
 
-import { QueryFilterState } from '../../shared/query-bar/query-bar.models';
+import { QueryFilterState, SEVERITY_OPTIONS } from '../../shared/query-bar/query-bar.models';
 
 import {
 
@@ -277,7 +277,13 @@ export class ConsolePageComponent implements OnInit, OnDestroy {
 
   private readonly api = inject(FmApiService);
 
+  private readonly route = inject(ActivatedRoute);
+
   private pollSub?: Subscription;
+
+  private querySub?: Subscription;
+
+  private listeningForQueryChanges = false;
 
 
 
@@ -332,6 +338,22 @@ export class ConsolePageComponent implements OnInit, OnDestroy {
 
 
 
+    this.querySub = this.route.queryParamMap.subscribe((params) => {
+
+      this.applySeverityQueryParam(params.get('severity'));
+
+      if (this.listeningForQueryChanges) {
+
+        this.loadEvents();
+
+      }
+
+    });
+
+    this.listeningForQueryChanges = true;
+
+
+
     if (this.pollingEnabled) {
 
       this.pollSub = interval(this.pollSec * 1000)
@@ -359,6 +381,8 @@ export class ConsolePageComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
 
     this.pollSub?.unsubscribe();
+
+    this.querySub?.unsubscribe();
 
   }
 
@@ -481,6 +505,32 @@ export class ConsolePageComponent implements OnInit, OnDestroy {
   private eventParams(): Record<string, string> {
 
     return buildEventApiParams(this.filter(), this.selectedMapId(), this.sortState());
+
+  }
+
+
+
+  private applySeverityQueryParam(severity: string | null): void {
+
+    if (!severity || !(SEVERITY_OPTIONS as readonly string[]).includes(severity)) {
+
+      return;
+
+    }
+
+    this.filter.update((current) => ({
+
+      ...current,
+
+      chips: [
+
+        ...current.chips.filter((chip) => chip.field !== 'severity'),
+
+        { id: 'severity-query', field: 'severity', operator: 'eq', value: severity },
+
+      ],
+
+    }));
 
   }
 

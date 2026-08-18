@@ -1,0 +1,10 @@
+{
+  "phase": "done",
+  "jiraKey": null,
+  "slug": "dashboard-product-health-tiles",
+  "title": "Плитки продуктов с % здоровья на Dashboard",
+  "source": "manual",
+  "riskLevel": "L3",
+  "approvals": { "discovery": true },
+  "backlogItem": "FM-20"
+}
