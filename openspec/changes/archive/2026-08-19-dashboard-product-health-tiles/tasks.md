@@ -1,0 +1,21 @@
+## 1. frontend/ — Vitest (red)
+
+- [x] 1.1 Rewrite `frontend/tests/unit/dashboard-product-health-tiles.test.ts`. Mock `getDashboardSummary` (severityCounts + systemMaps + unused `productPreview`), `getProducts` (Gift Shop-like rows with `healthPercent`; list `components[]` may still be slots), and `getProduct(id)` with Gift Shop `configurationItems` + `activeEvents`. Covers **Tiles show server healthPercent from the health list**, **Tiles sit below event maps**, **Tile shows all product CIs with buildProfiles percents**: maps heading before health heading; Gift Shop tile shows product-page summary (large `%`, HEALTH_LABELS e.g. Предупреждение, «Анализ урона», min/max) and a CI table (Название КЕ / Тип / Здоровье) with four FQDNs (storefront, catalog, checkout, postgres; service/database); no POWER/CPU/HDD/AVAILABILITY as the main tile body; click `['/health', id]` — red
+- [x] 1.2 Same spec, **Empty health list shows an empty panel**: `getProducts()` → `[]` → panel heading + `/health` link present, zero product tiles. Covers **Missing snapshot is rendered with product-page percent semantics**: empty `configurationItems` → 100%, no invented CIs/slots. Covers **Heatmap link remains in the block header** and **Click opens the product graph** — red
+- [x] 1.3 Same spec, **Priority counters and event maps stay on summary**: Critical/Major/Minor/Warning counts and `/console?severity=` links still come from `getDashboardSummary`; «Карты событий» still lists `systemMaps`; health-list/detail failure does not blank counters. Covers **All products from the health list are shown**, **Tile color follows percentToLevel not maxSeverity**, **Dashboard tiles use existing health REST only**: `getProducts` + `getProduct(id)`; no `GET /api/v1/health/ci/{id}` — red
+
+## 2. frontend/ — DashboardPageComponent (green)
+
+- [x] 2.1 In `DashboardPageComponent`, keep `getDashboardSummary()` independent. Subscribe to `getProducts()` for tile list (all rows). For each product id, `getProduct(id)` + `buildProfiles` for CI rows. Do not change `FmApiService`, health pages, or add a new Angular service. Health-list/detail errors must not blank FM-19 counters
+- [x] 2.2 Stack layout: counters → «Карты событий» (full width) → «Здоровье продуктов» (full width) → «Всего продуктов» (`products.length`). Stop `grid-template-columns: 1fr 2fr` for maps|tiles. Tile body: product-page health-summary aside (kicker name, large `%`, HEALTH_LABELS, damage-box «Анализ урона», min/max; no RCA/Sankey) plus a composition table (Название КЕ = fqdn, Тип = ciType, Здоровье = `buildProfiles` `%`); keep `damagePercent` / `minHealthToday` / `maxHealthToday` / detail `healthPercent` on the tile view. Color via `percentToLevel` (`data-level`). Keep `[routerLink]="['/health', p.id]"` and header `routerLink="/health"`. Wider product grid (`minmax` > 140px)
+- [x] 2.3 Run `cd frontend && npm test` — green for 1.1–1.3 and existing unit tests
+
+## 3. frontend/ — Playwright e2e (backend up)
+
+- [x] 3.1 Update `frontend/tests/e2e/dashboard-product-health-tiles.spec.ts`. Login; `goto('/')`. Covers **Tiles sit below event maps** and **Tile shows all product CIs with buildProfiles percents** for Gift Shop when seeded: summary «Анализ урона» + table headers Название КЕ / Тип / Здоровье; storefront, catalog, checkout, postgres FQDNs (not POWER/CPU/HDD/AVAILABILITY). Covers **Click opens the product graph** and **Heatmap link remains in the block header**
+- [x] 3.2 Same spec, **Priority counters and event maps stay on summary**: four severity cards and event-map links still present after tiles render (FM-19 unchanged)
+- [ ] 3.3 Run `cd frontend && npm run test:e2e` against running backend (`http://localhost:8080`) — green for this spec. Skip `mvn test` (frontend-only; hexagonal N/A). Leave unchecked if the stack is not up
+
+## 4. docs — pages-spec.md
+
+- [x] 4.1 Update `docs/pages-spec.md` Dashboard (`/`): stacked layout (counters → maps → tiles → «Всего продуктов»); «Здоровье продуктов» is tiles with the product-page summary card (`%`, HEALTH_LABELS, анализ урона, min/max) and a CI table (Название КЕ / Тип / Здоровье) from `getProduct` + `buildProfiles`; click → `/health/:id`; header → `/health`; counters unchanged. Do not edit OpenAPI or Liquibase

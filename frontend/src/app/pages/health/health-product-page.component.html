@@ -9,6 +9,13 @@
             <span class="code">{{ productAdmin!.code }}</span> ·
           }
           {{ product.tenant }} · {{ product.site }}
+          @if (product.tags?.length) {
+            <span class="tags">
+              @for (tag of product.tags; track tag) {
+                <span class="tag">{{ tag }}</span>
+              }
+            </span>
+          }
         </p>
       </div>
       <div class="top-actions">
@@ -29,44 +36,50 @@
     </div>
 
     <section class="composition">
-      <div class="section-head">
-        <h2>Состав продукта</h2>
-        @if (isAdmin()) {
-          <button type="button" class="btn-primary" (click)="openCiPicker()">+ Добавить КЕ</button>
-        }
-      </div>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>FQDN</th>
-            <th>Тип</th>
-            <th>Система</th>
-            <th>Подсистема</th>
-            @if (isAdmin()) {
-              <th></th>
-            }
-          </tr>
-        </thead>
-        <tbody>
-          @for (ci of ciList; track ci.id) {
-            <tr>
-              <td class="mono">{{ ci.fqdn }}</td>
-              <td>{{ ci.ciType }}</td>
-              <td>{{ ci.system }}</td>
-              <td>{{ ci.subsystem }}</td>
-              @if (isAdmin()) {
-                <td class="actions">
-                  <button type="button" class="link-btn danger" (click)="unlinkCi(ci.id)">Отвязать</button>
-                </td>
-              }
-            </tr>
-          } @empty {
-            <tr>
-              <td [attr.colspan]="isAdmin() ? 5 : 4" class="empty-row">Нет связанных КЕ</td>
-            </tr>
+      <details>
+        <summary>
+          <h2>Состав продукта</h2>
+        </summary>
+        <div class="composition-body">
+          @if (isAdmin()) {
+            <div class="composition-toolbar">
+              <button type="button" class="btn-primary" (click)="openCiPicker()">+ Добавить КЕ</button>
+            </div>
           }
-        </tbody>
-      </table>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>FQDN</th>
+                <th>Тип</th>
+                <th>Система</th>
+                <th>Подсистема</th>
+                @if (isAdmin()) {
+                  <th></th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (ci of ciList; track ci.id) {
+                <tr>
+                  <td class="mono">{{ ci.fqdn }}</td>
+                  <td>{{ ci.ciType }}</td>
+                  <td>{{ ci.system }}</td>
+                  <td>{{ ci.subsystem }}</td>
+                  @if (isAdmin()) {
+                    <td class="actions">
+                      <button type="button" class="link-btn danger" (click)="unlinkCi(ci.id)">Отвязать</button>
+                    </td>
+                  }
+                </tr>
+              } @empty {
+                <tr>
+                  <td [attr.colspan]="isAdmin() ? 5 : 4" class="empty-row">Нет связанных КЕ</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </details>
     </section>
 
     <section class="health-graph">
@@ -134,14 +147,7 @@
       }
     </div>
 
-    <div class="operative">
-      <app-ci-sidebar
-        [product]="product"
-        [ciList]="ciList"
-        [selectedCiId]="selectedCiId"
-        [profiles]="profiles"
-        (selectCi)="selectCi($event)"
-      />
+    <div class="operative" #operative id="operative">
       <div class="operative-main">
         <app-operative-center-panel
           [product]="product"
@@ -152,12 +158,6 @@
           defaultTab="health"
         />
       </div>
-    </div>
-
-    <div class="tags">
-      @for (tag of product.tags; track tag) {
-        <span class="tag">{{ tag }}</span>
-      }
     </div>
   </div>
 } @else {

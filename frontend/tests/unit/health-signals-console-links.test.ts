@@ -2,9 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
   Component,
-  EventEmitter,
   Input,
-  Output,
   ɵcompileComponent as compileComponent,
 } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
@@ -19,7 +17,6 @@ import { AuthService } from '../../src/app/core/auth/auth.service';
 import { CiHealthProfile } from '../../src/app/core/health/health.models';
 import { HealthProductPageComponent } from '../../src/app/pages/health/health-product-page.component';
 import { CiHealthTabComponent } from '../../src/app/shared/health/ci-health-tab.component';
-import { CiSidebarComponent } from '../../src/app/shared/health/ci-sidebar.component';
 import { ComponentWeightEditorComponent } from '../../src/app/shared/health/component-weight-editor.component';
 import { HealthBadgeComponent } from '../../src/app/shared/health/health-badge.component';
 import { HealthHistoryHeatmapComponent } from '../../src/app/shared/health/health-history-heatmap.component';
@@ -74,15 +71,6 @@ class HeatmapStub {
   @Input() buckets: unknown;
 }
 
-@Component({ selector: 'app-ci-sidebar', standalone: true, template: '' })
-class CiSidebarStub {
-  @Input() product: unknown;
-  @Input() ciList: unknown;
-  @Input() selectedCiId: unknown;
-  @Input() profiles: unknown;
-  @Output() selectCi = new EventEmitter<string>();
-}
-
 @Component({ selector: 'app-operative-center-panel', standalone: true, template: '' })
 class OperativeStub {
   @Input() product: unknown;
@@ -100,7 +88,6 @@ function compileHealthProductPage(): void {
     imports: [
       RouterLink,
       FormsModule,
-      CiSidebarComponent,
       OperativeCenterPanelComponent,
       HealthBadgeComponent,
       SeverityBadgeComponent,
@@ -196,12 +183,11 @@ describe('Health console links use productId', () => {
             imports: [
               MonqHealthGraphComponent,
               HealthHistoryHeatmapComponent,
-              CiSidebarComponent,
               OperativeCenterPanelComponent,
             ],
           },
           add: {
-            imports: [MonqHealthGraphStub, HeatmapStub, CiSidebarStub, OperativeStub],
+            imports: [MonqHealthGraphStub, HeatmapStub, OperativeStub],
           },
         })
         .compileComponents();

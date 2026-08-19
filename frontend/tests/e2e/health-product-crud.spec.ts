@@ -60,7 +60,17 @@ async function deleteProductFromHeatmap(page: Page, productName: string): Promis
   await page.locator('.modal-sm').getByRole('button', { name: 'Удалить' }).click();
 }
 
+async function expandComposition(page: Page): Promise<void> {
+  const details = page.locator('section.composition details');
+  await expect(details).toBeVisible();
+  if ((await details.getAttribute('open')) === null) {
+    await details.locator('summary').click();
+  }
+  await expect(details).toHaveAttribute('open', '');
+}
+
 async function unlinkAllCisOnProductPage(page: Page): Promise<void> {
+  await expandComposition(page);
   const unlinkButtons = page.getByRole('button', { name: 'Отвязать' });
   while ((await unlinkButtons.count()) > 0) {
     await dismissToasts(page);
