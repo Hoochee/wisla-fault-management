@@ -1,0 +1,32 @@
+﻿{
+  "phase": "done",
+  "jiraKey": "FM-20",
+  "changeName": "dashboard-product-health-tiles",
+  "branch": "feature/FM-20",
+  "riskLevel": "L3",
+  "modules": ["frontend"],
+  "approvals": {
+    "scope": true,
+    "artifacts": true,
+    "readyForPr": true
+  },
+  "tests": {
+    "backend": "skipped",
+    "frontend": "passed",
+    "frontend_e2e": "pending"
+  },
+  "testFixIterations": {
+    "backend": 0,
+    "frontend": 2
+  },
+  "codeReview": {
+    "backend": { "status": "skipped", "iterations": 0, "reviewers": {} },
+    "frontend": {
+      "status": "approved",
+      "iterations": 0,
+      "reviewers": {
+        "quality": "approved"
+      }
+    }
+  }
+}

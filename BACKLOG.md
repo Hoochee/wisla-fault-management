@@ -371,7 +371,7 @@
 |---|---|
 | **Ключ** | `FM-20` |
 | **Change (черновик)** | `dashboard-product-health-tiles` |
-| **Статус** | `ready` |
+| **Статус** | `done` |
 | **Приоритет** | `Высокий` |
 | **Модули** | `frontend/` (Dashboard `/`) |
 | **Откуда** | `/discovery` |

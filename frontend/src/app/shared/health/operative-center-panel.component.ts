@@ -111,7 +111,7 @@ type Tab = 'signals' | 'health' | 'params' | 'events';
   `,
   styles: [
     `
-      .panel { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+      .panel { display: flex; flex-direction: column; min-height: 0; }
       .header { display: flex; justify-content: space-between; margin-bottom: 1rem; }
       .subtitle { font-size: 0.75rem; color: var(--text-muted); }
       .fqdn { margin: 0.125rem 0 0; font-size: 1.125rem; font-weight: 600; color: var(--text-primary); font-family: var(--font-mono); }
@@ -124,7 +124,7 @@ type Tab = 'signals' | 'health' | 'params' | 'events';
       .tab:hover { color: var(--text-primary); }
       .tab.active { border-bottom-color: var(--accent); color: var(--accent); }
       .badge-count { margin-left: 0.375rem; padding: 0 0.375rem; font-size: 10px; border-radius: 4px; background: var(--danger); color: #fff; }
-      .content { flex: 1; overflow: auto; min-height: 0; }
+      .content { flex: 1; overflow: visible; min-height: 0; }
       .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
       .card h3 { margin: 0 0 0.75rem; font-size: 0.875rem; color: var(--text-primary); font-weight: 500; }
       .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }

@@ -2,9 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
   Component,
-  EventEmitter,
   Input,
-  Output,
   ɵcompileComponent as compileComponent,
 } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
@@ -15,9 +13,8 @@ import { of } from 'rxjs';
 import { describe, it, expect, vi } from 'vitest';
 import { FmApiService } from '../../src/app/core/api/fm-api.service';
 import { AuthService } from '../../src/app/core/auth/auth.service';
-import { ProductAdmin, ProductHealthDetail, ProductPatchRequest, User } from '../../src/app/core/api/api.models';
+import { ConfigurationItem, ProductAdmin, ProductHealthDetail, ProductPatchRequest, User } from '../../src/app/core/api/api.models';
 import { HealthProductPageComponent } from '../../src/app/pages/health/health-product-page.component';
-import { CiSidebarComponent } from '../../src/app/shared/health/ci-sidebar.component';
 import { ComponentWeightEditorComponent } from '../../src/app/shared/health/component-weight-editor.component';
 import { HealthBadgeComponent } from '../../src/app/shared/health/health-badge.component';
 import { HealthHistoryHeatmapComponent } from '../../src/app/shared/health/health-history-heatmap.component';
@@ -44,15 +41,6 @@ class HeatmapStub {
   @Input() buckets: unknown;
 }
 
-@Component({ selector: 'app-ci-sidebar', standalone: true, template: '' })
-class CiSidebarStub {
-  @Input() product: unknown;
-  @Input() ciList: unknown;
-  @Input() selectedCiId: unknown;
-  @Input() profiles: unknown;
-  @Output() selectCi = new EventEmitter<string>();
-}
-
 @Component({ selector: 'app-operative-center-panel', standalone: true, template: '' })
 class OperativeStub {
   @Input() product: unknown;
@@ -70,7 +58,6 @@ function compileHealthProductPage(): void {
     imports: [
       RouterLink,
       FormsModule,
-      CiSidebarComponent,
       OperativeCenterPanelComponent,
       HealthBadgeComponent,
       SeverityBadgeComponent,
@@ -204,12 +191,11 @@ async function setup(opts: { admin: boolean }) {
         imports: [
           MonqHealthGraphComponent,
           HealthHistoryHeatmapComponent,
-          CiSidebarComponent,
           OperativeCenterPanelComponent,
         ],
       },
       add: {
-        imports: [MonqHealthGraphStub, HeatmapStub, CiSidebarStub, OperativeStub],
+        imports: [MonqHealthGraphStub, HeatmapStub, OperativeStub],
       },
     })
     .compileComponents();
@@ -226,6 +212,9 @@ describe('HealthProductPageComponent weight modal', () => {
     expect(buttonByText(el, 'Веса компонентов')).toBeTruthy();
     expect(el.querySelector('app-component-weight-editor')).toBeNull();
     expect(componentsWeightHeader(el)).toContain('Вес');
+    expect(el.querySelector('.page > .tags')).toBeNull();
+    expect(el.querySelector('app-ci-sidebar')).toBeNull();
+    expect(el.querySelector('.ci-strip .ci-chip')).toBeTruthy();
   });
 
   it('does not show the weight button or editor for a specialist', async () => {
@@ -296,5 +285,71 @@ describe('HealthProductPageComponent weight modal', () => {
 
     expect(api.patchProduct).not.toHaveBeenCalled();
     expect(el.querySelector('app-component-weight-editor')).toBeNull();
+  });
+});
+
+describe('HealthProductPageComponent composition spoiler', () => {
+  it('keeps «Состав продукта» collapsed by default and shows the CI table after expand', async () => {
+    const { fixture, el } = await setup({ admin: true });
+    const details = el.querySelector('section.composition details') as HTMLDetailsElement;
+
+    expect(details).toBeTruthy();
+    expect(details.open).toBe(false);
+    expect(el.querySelector('section.composition h2')?.textContent?.trim()).toBe('Состав продукта');
+    expect(buttonByText(el, '+ Добавить КЕ')).toBeTruthy();
+
+    details.querySelector('summary')!.click();
+    fixture.detectChanges();
+
+    expect(details.open).toBe(true);
+    const headers = Array.from(el.querySelectorAll('section.composition th')).map((th) => th.textContent?.trim());
+    expect(headers).toEqual(expect.arrayContaining(['FQDN', 'Тип', 'Система', 'Подсистема']));
+    expect(el.querySelector('section.composition tbody')?.textContent).toContain('demo-server.wisla.local');
+    expect(buttonByText(el, 'Отвязать')).toBeTruthy();
+  });
+
+  it('does not show add or unlink CI actions for a specialist after expand', async () => {
+    const { fixture, el } = await setup({ admin: false });
+    const details = el.querySelector('section.composition details') as HTMLDetailsElement;
+
+    details.querySelector('summary')!.click();
+    fixture.detectChanges();
+
+    expect(details.open).toBe(true);
+    expect(buttonByText(el, '+ Добавить КЕ')).toBeUndefined();
+    expect(buttonByText(el, 'Отвязать')).toBeUndefined();
+    expect(el.querySelector('section.composition tbody')?.textContent).toContain('demo-server.wisla.local');
+  });
+});
+
+describe('HealthProductPageComponent CI strip', () => {
+  it('selectCi sets selectedCiId, marks the chip, and scrolls the operative panel', async () => {
+    const { fixture, el } = await setup({ admin: false });
+    const cmp = fixture.componentInstance;
+    const second: ConfigurationItem = {
+      id: 'ci-2',
+      fqdn: 'giftshop-catalog.demo',
+      ciType: 'service',
+      system: 'demo',
+      subsystem: 'web',
+      software: '',
+      products: [],
+      tags: [],
+    };
+    cmp.ciList = [...cmp.ciList, second];
+    fixture.detectChanges();
+
+    const operative = el.querySelector('.operative') as HTMLElement;
+    expect(operative).toBeTruthy();
+    expect(cmp.operativeEl?.nativeElement).toBe(operative);
+    const scroll = vi.fn();
+    operative.scrollIntoView = scroll;
+
+    cmp.selectCi('ci-2');
+    fixture.detectChanges();
+
+    expect(cmp.selectedCiId).toBe('ci-2');
+    expect(el.querySelector('.ci-chip.selected')?.textContent).toContain('giftshop-catalog.demo');
+    expect(scroll).toHaveBeenCalledWith({ behavior: 'smooth', block: 'nearest' });
   });
 });

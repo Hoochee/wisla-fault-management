@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  height: calc(100vh - 8rem);
+  min-height: 0;
 }
 
 .top {
@@ -30,17 +30,22 @@
 
 .composition,
 .health-graph {
-  flex-shrink: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 1rem;
   background: var(--bg-card);
 }
 
+.composition {
+  flex-shrink: 0;
+}
+
 .health-graph {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .graph-head {
@@ -51,10 +56,54 @@
 }
 
 .graph-head h2,
-.section-head h2 {
+.composition summary h2 {
   margin: 0;
   font-size: 0.9375rem;
   color: var(--text-primary);
+}
+
+.composition details {
+  min-width: 0;
+}
+
+.composition summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.composition summary::-webkit-details-marker,
+.composition summary::marker {
+  display: none;
+  content: '';
+}
+
+.composition summary::before {
+  content: '';
+  width: 0.375rem;
+  height: 0.375rem;
+  border-right: 2px solid var(--text-muted);
+  border-bottom: 2px solid var(--text-muted);
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+
+.composition details[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.composition-body {
+  margin-top: 0.75rem;
+}
+
+.composition-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
 }
 
 .components-card h3 {
@@ -66,13 +115,6 @@
 
 .data-table .num {
   text-align: right;
-}
-
-.section-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.75rem;
 }
 
 .mono {
@@ -265,7 +307,7 @@ h1 {
 }
 
 .operative {
-  flex: 1;
+  flex: 1 0 auto;
   min-height: 0;
   display: flex;
   gap: 1rem;
@@ -278,14 +320,15 @@ h1 {
 .operative-main {
   flex: 1;
   min-width: 0;
-  overflow: auto;
 }
 
 .tags {
-  display: flex;
+  display: inline-flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.25rem;
-  flex-shrink: 0;
+  margin-left: 0.35rem;
+  vertical-align: middle;
 }
 
 .tag {

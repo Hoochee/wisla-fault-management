@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, ElementRef, inject, OnInit, signal, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -17,7 +17,6 @@ import {
 import { CiHealthProfile } from '../../core/health/health.models';
 import { hasSankeyGraph } from '../../core/health/health-snapshot.mapper';
 import { buildProfiles, findWorstCi, getHealthPercentColor, percentToLevel } from '../../core/health/health-profile.util';
-import { CiSidebarComponent } from '../../shared/health/ci-sidebar.component';
 import { ComponentWeightEditorComponent } from '../../shared/health/component-weight-editor.component';
 import { HealthBadgeComponent } from '../../shared/health/health-badge.component';
 import { HealthHistoryHeatmapComponent } from '../../shared/health/health-history-heatmap.component';
@@ -39,7 +38,6 @@ interface ProductForm {
   imports: [
     RouterLink,
     FormsModule,
-    CiSidebarComponent,
     OperativeCenterPanelComponent,
     HealthBadgeComponent,
     SeverityBadgeComponent,
@@ -83,6 +81,7 @@ export class HealthProductPageComponent implements OnInit {
   readonly deleteBlocked = signal(false);
   readonly weightError = signal('');
   readonly weightModalOpen = signal(false);
+  @ViewChild('operative') operativeEl?: ElementRef<HTMLElement>;
 
   readonly filteredCis = computed(() => {
     const q = this.ciSearch.trim().toLowerCase();
@@ -102,6 +101,7 @@ export class HealthProductPageComponent implements OnInit {
 
   selectCi(id: string): void {
     this.selectedCiId = id;
+    this.operativeEl?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   openEditProduct(): void {
